@@ -42,3 +42,11 @@ mvn test -Dtest=ClassName#methodName
 - Document: `file_hash`, `encryption_iv`, `version_number`, `classification_level`
 
 See DEVELOPMENT_PLAN.md and DEV_CHECKLIST.md for implementation details.
+
+## Documentation
+
+**Always keep documentation up to date.** When making changes to the codebase:
+- Update relevant documentation in the `docs/` directory
+- Document new features, APIs, and architectural decisions
+- Keep API documentation in sync with implementation changes
+- Update README and guides when workflows change

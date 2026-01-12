@@ -28,5 +28,7 @@ if [ ! -f "$MAVEN_WRAPPER_JAR" ]; then
 fi
 
 exec "$JAVACMD" \
-  -jar "$MAVEN_WRAPPER_JAR" \
+  -Dmaven.multiModuleProjectDirectory="$MAVEN_PROJECTBASEDIR" \
+  -cp "$MAVEN_WRAPPER_JAR" \
+  org.apache.maven.wrapper.MavenWrapperMain \
   "$@"
