@@ -81,10 +81,12 @@ public class AuditLog {
      */
     public enum ActionType {
         // Authentication events
+        LOGIN_ATTEMPT,
         LOGIN_SUCCESS,
         LOGIN_FAILURE,
         LOGOUT,
         SESSION_EXPIRED,
+        TOKEN_REFRESH,
 
         // Document operations
         DOCUMENT_UPLOAD,
@@ -97,6 +99,10 @@ public class AuditLog {
         USER_CREATE,
         USER_UPDATE,
         USER_DELETE,
+        USER_ROLE_UPDATE,
+        USER_CLEARANCE_UPDATE,
+        USER_DEACTIVATE,
+        USER_UNLOCK,
         ROLE_ASSIGN,
         ROLE_REVOKE,
 
