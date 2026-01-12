@@ -4,7 +4,7 @@ import { type ReactNode, useId } from 'react';
 import { cn } from '@/lib/utils';
 import { Input, type InputProps } from './input';
 
-export interface FormFieldProps extends InputProps {
+export interface FormFieldProps extends Omit<InputProps, 'error'> {
   label: string;
   error?: string;
   hint?: string;
