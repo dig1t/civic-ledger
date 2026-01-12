@@ -1,9 +1,9 @@
 Development Plan: CivicLedger Secure Document Management
 Target Environment: US Government / Defense (FedRAMP/NIST 800-53 focus)
-Tech Stack: 
+Tech Stack:
 - Backend: Spring Boot 3.x (Java 17+)
 - Database: PostgreSQL (Neon.tech)
-- Frontend: React (Aria-compliant)
+- Frontend: Next.js 14+ (App Router, TypeScript, TailwindCSS)
 - Deployment: Docker (Render for Backend, Vercel for Frontend)
 
 1. Project Vision & Compliance Goals
@@ -53,10 +53,14 @@ Download: Verify User Permission -> Retrieve -> Decrypt -> Verify Hash -> Stream
 
 Strict decorators (e.g., @PreAuthorize("hasRole('AUDITOR')")) for the Audit log endpoints.
 
-4. Phase 3: Section 508 Compliant Frontend
+4. Phase 3: Section 508 Compliant Frontend (Next.js)
 [ ] Setup:
 
-Use a high-contrast component library (like USWDS - U.S. Web Design System - if possible, or standard Tailwind with high-contrast config).
+Next.js 14+ with App Router and TypeScript.
+
+TailwindCSS with high-contrast configuration for accessibility.
+
+Consider USWDS (U.S. Web Design System) design tokens where applicable.
 
 [ ] Accessibility Requirements:
 
@@ -65,6 +69,8 @@ Full keyboard navigation (Focus rings visible).
 aria-live regions for file upload progress.
 
 Semantic HTML (main, nav, section tags).
+
+Server Components for improved performance and SEO.
 
 [ ] Views:
 

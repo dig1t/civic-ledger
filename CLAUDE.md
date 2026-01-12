@@ -4,10 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-CivicLedger is a secure document management system for US Government/Defense compliance (FedRAMP/NIST 800-53). Spring Boot 3.3.0 backend with PostgreSQL database.
+CivicLedger is a secure document management system for US Government/Defense compliance (FedRAMP/NIST 800-53). Spring Boot 3.3.0 backend with PostgreSQL database and Next.js frontend.
 
 ## Commands
 
+### Backend (Spring Boot)
 ```bash
 # Start database
 docker-compose up -d
@@ -22,6 +23,27 @@ mvn test -Dtest=ClassName
 mvn test -Dtest=ClassName#methodName
 ```
 
+### Frontend (Next.js)
+```bash
+# Navigate to frontend directory
+cd frontend
+
+# Install dependencies
+npm install
+
+# Development server
+npm run dev
+
+# Build for production
+npm run build
+
+# Run production build
+npm start
+
+# Linting
+npm run lint
+```
+
 ## Architecture
 
 **Security-first design:**
@@ -32,10 +54,16 @@ mvn test -Dtest=ClassName#methodName
 
 **RBAC roles:** ADMINISTRATOR, OFFICER (upload/read), AUDITOR (read logs only)
 
-**Clean separation:**
+**Backend (Spring Boot):**
 - Controllers: API layer only
 - Services: Business logic
 - Repositories: Data access
+
+**Frontend (Next.js 14+):**
+- App Router with TypeScript
+- TailwindCSS for styling (high-contrast for accessibility)
+- Server Components where applicable
+- Section 508 / WCAG 2.1 AA compliance required
 
 **Key entities to implement:**
 - AuditLog: `action_type`, `user_id`, `timestamp`, `ip_address`, `resource_id` (write-once)

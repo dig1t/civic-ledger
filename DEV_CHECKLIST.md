@@ -35,11 +35,22 @@
     - [x] Create "Dev-Only" login endpoint (bypasses complex PIV/CAC integration for portfolio demo)
 
 ## 🖥️ Phase 3: Accessibility-First Frontend (Medium Priority)
-- [ ] **React Boilerplate**
-    - [ ] Vite + TypeScript setup
-    - [ ] Tailwind CSS + `eslint-plugin-jsx-a11y`
+- [ ] **Next.js Setup**
+    - [ ] Next.js 14+ with App Router and TypeScript
+    - [ ] TailwindCSS configuration with high-contrast theme
+    - [ ] `eslint-plugin-jsx-a11y` for accessibility linting
+    - [ ] Project structure: `frontend/` directory
+- [ ] **Core Configuration**
+    - [ ] Environment variables for API endpoint
+    - [ ] Authentication context/provider for JWT handling
+    - [ ] API client with fetch/axios for backend communication
 - [ ] **Officer Dashboard** (Upload & Search)
+    - [ ] Document upload with drag-and-drop
+    - [ ] Document list with search/filter
+    - [ ] Classification level selector
 - [ ] **Auditor Dashboard** (ReadOnly Log Stream)
+    - [ ] Real-time audit log display
+    - [ ] Log filtering and search
 
 ## 🤖 Phase 4: AI & Automation (Bonus - Job Specific)
 - [ ] **AI Summary Agent**
