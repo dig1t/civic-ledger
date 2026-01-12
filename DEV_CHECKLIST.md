@@ -11,20 +11,20 @@
 - [ ] **Environment Configuration**
     - [ ] Setup `application.properties` (or `.yml`) with profiles (dev, prod)
 
-## 🛡️ Phase 1: The "Vault" Core (High Importance - The "Gov" Differentiators)
+## 🛡️ Phase 1: The "Vault" Core (High Importance - The "Gov" Differentiators) ✅
 *These features prove you understand Federal compliance (NIST 800-53).*
-- [ ] **Immutable Audit Engine** (Priority #1)
-    - [ ] Define `AuditLog` entity (Timestamp, User, Action, Resource, IP, Status)
-    - [ ] Implement AOP Aspect (`@Audit`) to intercept service calls automatically
-    - [ ] **Why:** "If it isn't documented, it didn't happen."
-- [ ] **Cryptographic Module** (Priority #2)
-    - [ ] Implement `EncryptionService` (AES-256-GCM for file content)
-    - [ ] Implement `HashingService` (SHA-256 for integrity verification)
-    - [ ] **Why:** Mandatory for FIPS 140-2 compliance.
-- [ ] **Secure Storage Layer** (Priority #3)
-    - [ ] File System Adapter (Local dev)
+- [x] **Immutable Audit Engine** (Priority #1)
+    - [x] Define `AuditLog` entity (Timestamp, User, Action, Resource, IP, Status)
+    - [x] Implement AOP Aspect (`@Auditable`) to intercept service calls automatically
+    - [x] **Why:** "If it isn't documented, it didn't happen."
+- [x] **Cryptographic Module** (Priority #2)
+    - [x] Implement `EncryptionService` (AES-256-GCM for file content)
+    - [x] Implement `HashingService` (SHA-256 for integrity verification)
+    - [x] **Why:** Mandatory for FIPS 140-2 compliance.
+- [x] **Secure Storage Layer** (Priority #3)
+    - [x] File System Adapter (Local dev)
     - [ ] S3/Blob Adapter (Production)
-    - [ ] **Constraint:** Files are never stored raw; only encrypted bytes.
+    - [x] **Constraint:** Files are never stored raw; only encrypted bytes.
 
 ## 🔐 Phase 2: Access & Identity (Medium Priority)
 - [ ] **RBAC Implementation**
