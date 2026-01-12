@@ -26,13 +26,13 @@
     - [ ] S3/Blob Adapter (Production)
     - [x] **Constraint:** Files are never stored raw; only encrypted bytes.
 
-## 🔐 Phase 2: Access & Identity (Medium Priority)
-- [ ] **RBAC Implementation**
-    - [ ] Define Roles: `OFFICER` (Upload/Read), `AUDITOR` (Read Logs), `ADMIN`
-    - [ ] Implement Spring Security Filter Chain
-    - [ ] JWT Token Generation & Validation
-- [ ] **Mock Authentication**
-    - [ ] Create "Dev-Only" login endpoint (bypasses complex PIV/CAC integration for portfolio demo)
+## 🔐 Phase 2: Access & Identity (Medium Priority) ✅
+- [x] **RBAC Implementation**
+    - [x] Define Roles: `OFFICER` (Upload/Read), `AUDITOR` (Read Logs), `ADMIN`
+    - [x] Implement Spring Security Filter Chain
+    - [x] JWT Token Generation & Validation
+- [x] **Mock Authentication**
+    - [x] Create "Dev-Only" login endpoint (bypasses complex PIV/CAC integration for portfolio demo)
 
 ## 🖥️ Phase 3: Accessibility-First Frontend (Medium Priority)
 - [ ] **React Boilerplate**

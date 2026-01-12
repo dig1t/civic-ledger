@@ -74,6 +74,13 @@ public class User {
     private Instant lockedUntil;
 
     /**
+     * Password hash for mock authentication (dev/demo only).
+     * In production, authentication is handled by Keycloak/PIV.
+     */
+    @Column
+    private String passwordHash;
+
+    /**
      * Security clearance level (for document access control).
      */
     @Enumerated(EnumType.STRING)
