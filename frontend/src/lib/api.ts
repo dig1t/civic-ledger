@@ -1,3 +1,5 @@
+import { emitAuthFailure } from './auth-events';
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api';
 
 export class ApiError extends Error {
@@ -19,6 +21,12 @@ function getAuthHeaders(): HeadersInit {
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
+
+    // Handle authentication failures - emit event for redirect
+    if (response.status === 401) {
+      emitAuthFailure(errorData.message || 'Your session has expired. Please log in again.');
+    }
+
     throw new ApiError(
       errorData.message || `Request failed with status ${response.status}`,
       response.status,
@@ -82,6 +90,11 @@ export const api = {
             resolve(undefined as T);
           }
         } else {
+          // Handle authentication failures
+          if (xhr.status === 401) {
+            emitAuthFailure('Your session has expired. Please log in again.');
+          }
+
           try {
             const errorData = JSON.parse(xhr.responseText);
             reject(new ApiError(errorData.message || 'Upload failed', xhr.status, errorData.code));
