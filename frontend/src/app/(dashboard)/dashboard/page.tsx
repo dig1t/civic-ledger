@@ -21,7 +21,6 @@ export default function DashboardPage() {
       .get<DashboardStats>('/dashboard/stats')
       .then(setStats)
       .catch(() => {
-        // Use placeholder data if API fails
         setStats({
           totalDocuments: 0,
           documentsThisMonth: 0,

@@ -4,7 +4,7 @@ import { type ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { useAuth } from '@/lib/auth';
+import { useAuth, useRequireAuth } from '@/lib/auth';
 
 const navigationLinks = {
   ADMINISTRATOR: [
@@ -26,9 +26,12 @@ const navigationLinks = {
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const { user, logout, isLoading } = useAuth();
+  const { logout } = useAuth();
+  // useRequireAuth handles redirect to /login if not authenticated
+  const { user, isLoading, isAuthorized } = useRequireAuth();
 
-  if (isLoading) {
+  // Show loading spinner while checking auth or redirecting
+  if (isLoading || !isAuthorized) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
@@ -37,17 +40,15 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             role="status"
             aria-label="Loading"
           />
-          <p className="mt-2 text-neutral-500">Loading...</p>
+          <p className="mt-2 text-neutral-500">
+            {isLoading ? 'Loading...' : 'Redirecting to login...'}
+          </p>
         </div>
       </div>
     );
   }
 
-  if (!user) {
-    return null;
-  }
-
-  const links = navigationLinks[user.role] || [];
+  const links = navigationLinks[user!.role] || [];
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -63,9 +64,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
           <div className="flex items-center gap-4">
             <span className="text-sm text-neutral-600">
-              {user.name}{' '}
+              {user!.name}{' '}
               <span className="rounded bg-neutral-100 px-2 py-1 text-xs font-medium text-neutral-700">
-                {user.role}
+                {user!.role}
               </span>
             </span>
             <button
