@@ -9,11 +9,7 @@ import {
   type AuditLogFilters,
 } from '@/components/audit';
 
-interface AuditLogResponse {
-  logs: AuditLogEntry[];
-  hasMore: boolean;
-  nextCursor?: string;
-}
+// Backend returns a plain array of audit logs
 
 export default function AuditLogsPage() {
   const { isAuthorized } = useRequireAuth('AUDITOR', 'ADMINISTRATOR');
@@ -46,15 +42,16 @@ export default function AuditLogsPage() {
 
         const queryString = params.toString();
         const endpoint = `/audit-logs${queryString ? `?${queryString}` : ''}`;
-        const data = await api.get<AuditLogResponse>(endpoint);
+        const data = await api.get<AuditLogEntry[]>(endpoint);
 
         if (append) {
-          setLogs((prev) => [...prev, ...data.logs]);
+          setLogs((prev) => [...prev, ...data]);
         } else {
-          setLogs(data.logs);
+          setLogs(data);
         }
-        setHasMore(data.hasMore);
-        setCursor(data.nextCursor);
+        // Backend doesn't support pagination yet
+        setHasMore(false);
+        setCursor(undefined);
       } catch {
         if (!append) {
           setLogs([]);

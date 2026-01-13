@@ -62,11 +62,15 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 // Public endpoints
                 .requestMatchers("/api/health/**", "/actuator/health/**").permitAll()
-                .requestMatchers("/api/auth/**").permitAll()
+                .requestMatchers("/api/auth/login", "/api/auth/logout", "/api/auth/refresh").permitAll()
+                // Authenticated user info
+                .requestMatchers("/api/auth/me").authenticated()
+                // Dashboard - any authenticated user
+                .requestMatchers("/api/dashboard/**").authenticated()
                 // Role-based access
                 .requestMatchers("/api/admin/**").hasRole("ADMINISTRATOR")
                 .requestMatchers("/api/documents/**").hasAnyRole("OFFICER", "ADMINISTRATOR")
-                .requestMatchers("/api/audit/**").hasAnyRole("AUDITOR", "ADMINISTRATOR")
+                .requestMatchers("/api/audit-logs/**", "/api/audit/**").hasAnyRole("AUDITOR", "ADMINISTRATOR")
                 .anyRequest().authenticated());
 
         // Configure authentication based on mode

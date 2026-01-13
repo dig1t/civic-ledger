@@ -53,4 +53,9 @@ public interface UserRepository extends JpaRepository<User, UUID> {
      */
     @Query("SELECT u FROM User u JOIN u.roles r WHERE r = 'ADMINISTRATOR' AND u.active = true")
     List<User> findAdministrators();
+
+    /**
+     * Count active users.
+     */
+    long countByActiveTrue();
 }

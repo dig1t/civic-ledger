@@ -7,23 +7,16 @@ import { Input } from '@/components/ui/input';
 
 export interface AuditLogEntry {
   id: string;
-  actionType:
-    | 'DOCUMENT_UPLOAD'
-    | 'DOCUMENT_DOWNLOAD'
-    | 'DOCUMENT_DELETE'
-    | 'USER_LOGIN'
-    | 'USER_LOGOUT'
-    | 'USER_CREATE'
-    | 'USER_UPDATE'
-    | 'PERMISSION_CHANGE'
-    | 'SYSTEM_EVENT';
+  actionType: string;
   userId: string;
-  userName: string;
+  userName?: string;
   resourceId?: string;
   resourceName?: string;
+  resourceType?: string;
   ipAddress: string;
   timestamp: string;
   details?: string;
+  status?: string;
 }
 
 interface AuditLogStreamProps {
@@ -41,29 +34,49 @@ export interface AuditLogFilters {
   endDate?: string;
 }
 
-const actionTypeLabels: Record<AuditLogEntry['actionType'], string> = {
+const actionTypeLabels: Record<string, string> = {
   DOCUMENT_UPLOAD: 'Document Upload',
   DOCUMENT_DOWNLOAD: 'Document Download',
+  DOCUMENT_VIEW: 'Document View',
   DOCUMENT_DELETE: 'Document Delete',
-  USER_LOGIN: 'User Login',
-  USER_LOGOUT: 'User Logout',
+  DOCUMENT_UPDATE: 'Document Update',
+  LOGIN_ATTEMPT: 'Login Attempt',
+  LOGIN_SUCCESS: 'Login Success',
+  LOGIN_FAILURE: 'Login Failure',
+  LOGOUT: 'Logout',
+  SESSION_EXPIRED: 'Session Expired',
   USER_CREATE: 'User Created',
   USER_UPDATE: 'User Updated',
-  PERMISSION_CHANGE: 'Permission Change',
-  SYSTEM_EVENT: 'System Event',
+  USER_DELETE: 'User Deleted',
+  USER_DEACTIVATE: 'User Deactivated',
+  ROLE_ASSIGN: 'Role Assigned',
+  ROLE_REVOKE: 'Role Revoked',
+  SYSTEM_START: 'System Start',
+  SECURITY_ALERT: 'Security Alert',
 };
 
-const actionTypeColors: Record<AuditLogEntry['actionType'], string> = {
+const actionTypeColors: Record<string, string> = {
   DOCUMENT_UPLOAD: 'bg-success-lighter text-success-dark border-success',
   DOCUMENT_DOWNLOAD: 'bg-info-lighter text-info-dark border-info',
+  DOCUMENT_VIEW: 'bg-info-lighter text-info-dark border-info',
   DOCUMENT_DELETE: 'bg-error-lighter text-error-dark border-error',
-  USER_LOGIN: 'bg-primary-lighter text-primary-dark border-primary',
-  USER_LOGOUT: 'bg-neutral-200 text-neutral-700 border-neutral-400',
+  DOCUMENT_UPDATE: 'bg-warning-lighter text-warning-dark border-warning',
+  LOGIN_ATTEMPT: 'bg-primary-lighter text-primary-dark border-primary',
+  LOGIN_SUCCESS: 'bg-success-lighter text-success-dark border-success',
+  LOGIN_FAILURE: 'bg-error-lighter text-error-dark border-error',
+  LOGOUT: 'bg-neutral-200 text-neutral-700 border-neutral-400',
+  SESSION_EXPIRED: 'bg-warning-lighter text-warning-dark border-warning',
   USER_CREATE: 'bg-success-lighter text-success-dark border-success',
   USER_UPDATE: 'bg-warning-lighter text-warning-dark border-warning',
-  PERMISSION_CHANGE: 'bg-warning-lighter text-warning-dark border-warning',
-  SYSTEM_EVENT: 'bg-neutral-200 text-neutral-700 border-neutral-400',
+  USER_DELETE: 'bg-error-lighter text-error-dark border-error',
+  USER_DEACTIVATE: 'bg-warning-lighter text-warning-dark border-warning',
+  ROLE_ASSIGN: 'bg-info-lighter text-info-dark border-info',
+  ROLE_REVOKE: 'bg-warning-lighter text-warning-dark border-warning',
+  SYSTEM_START: 'bg-neutral-200 text-neutral-700 border-neutral-400',
+  SECURITY_ALERT: 'bg-error-lighter text-error-dark border-error',
 };
+
+const defaultColor = 'bg-neutral-200 text-neutral-700 border-neutral-400';
 
 function formatTimestamp(timestamp: string): string {
   const date = new Date(timestamp);
@@ -92,10 +105,11 @@ export function AuditLogStream({
 
   // Announce new logs to screen readers
   useEffect(() => {
-    if (logs.length > 0 && newLogsCount !== logs.length) {
-      setNewLogsCount(logs.length);
+    const count = logs?.length ?? 0;
+    if (count > 0 && newLogsCount !== count) {
+      setNewLogsCount(count);
     }
-  }, [logs.length, newLogsCount]);
+  }, [logs, newLogsCount]);
 
   const handleFilterSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -122,7 +136,7 @@ export function AuditLogStream({
       >
         {isLoading
           ? 'Loading audit logs...'
-          : `Showing ${logs.length} audit log entries`}
+          : `Showing ${logs?.length ?? 0} audit log entries`}
       </div>
 
       {/* Filters toggle */}
@@ -231,7 +245,7 @@ export function AuditLogStream({
 
       {/* Audit log list */}
       <div className="space-y-2">
-        {isLoading && logs.length === 0 ? (
+        {isLoading && (!logs || logs.length === 0) ? (
           <div className="card py-12 text-center">
             <div
               className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"
@@ -240,7 +254,7 @@ export function AuditLogStream({
             />
             <p className="mt-2 text-neutral-500">Loading audit logs...</p>
           </div>
-        ) : logs.length === 0 ? (
+        ) : !logs || logs.length === 0 ? (
           <div className="card py-12 text-center text-neutral-500">
             No audit log entries found
           </div>
@@ -254,10 +268,10 @@ export function AuditLogStream({
                       <span
                         className={cn(
                           'inline-block rounded border px-2 py-0.5 text-xs font-medium',
-                          actionTypeColors[log.actionType]
+                          actionTypeColors[log.actionType] || defaultColor
                         )}
                       >
-                        {actionTypeLabels[log.actionType]}
+                        {actionTypeLabels[log.actionType] || log.actionType.replace(/_/g, ' ')}
                       </span>
                       <time
                         dateTime={log.timestamp}
@@ -268,12 +282,12 @@ export function AuditLogStream({
                     </div>
 
                     <p className="text-sm text-neutral-900">
-                      <span className="font-medium">{log.userName}</span>
-                      {log.resourceName && (
+                      <span className="font-medium">{log.userName || log.userId}</span>
+                      {(log.resourceName || log.resourceId) && (
                         <>
                           {' '}
                           &rarr;{' '}
-                          <span className="font-medium">{log.resourceName}</span>
+                          <span className="font-medium">{log.resourceName || log.resourceId}</span>
                         </>
                       )}
                     </p>
@@ -302,7 +316,7 @@ export function AuditLogStream({
           </div>
         )}
 
-        {isLoading && logs.length > 0 && (
+        {isLoading && logs && logs.length > 0 && (
           <div className="pt-4 text-center text-neutral-500">
             Loading more entries...
           </div>

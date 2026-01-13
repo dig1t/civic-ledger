@@ -38,8 +38,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const token = localStorage.getItem('token');
     if (token) {
       api
-        .get<User>('/auth/me')
-        .then(setUser)
+        .get<{ id: string; email: string; fullName: string; roles: string[] }>('/auth/me')
+        .then((data) => {
+          // Map backend user DTO to frontend User interface
+          setUser({
+            id: data.id,
+            email: data.email,
+            name: data.fullName,
+            role: data.roles[0] as UserRole,
+          });
+        })
         .catch(() => {
           localStorage.removeItem('token');
         })
@@ -71,8 +79,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const data = await response.json();
-    localStorage.setItem('token', data.token);
-    setUser(data.user);
+    localStorage.setItem('token', data.accessToken);
+
+    // Map backend user DTO to frontend User interface
+    const user: User = {
+      id: data.user.id,
+      email: data.user.email,
+      name: data.user.fullName,
+      role: data.user.roles[0] as UserRole, // Primary role
+    };
+    setUser(user);
     router.push('/dashboard');
   }
 
