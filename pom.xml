@@ -72,6 +72,13 @@
 			<scope>test</scope>
 		</dependency>
 
+		<!-- OpenAPI / Swagger Documentation -->
+		<dependency>
+			<groupId>org.springdoc</groupId>
+			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+			<version>2.5.0</version>
+		</dependency>
+
 		<!-- JWT Support for mock authentication -->
 		<dependency>
 			<groupId>io.jsonwebtoken</groupId>
