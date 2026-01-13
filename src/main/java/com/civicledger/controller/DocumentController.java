@@ -6,7 +6,12 @@ import com.civicledger.entity.Document;
 import com.civicledger.entity.User;
 import com.civicledger.repository.DocumentRepository;
 import com.civicledger.service.AuditService;
+import com.civicledger.service.EncryptionService;
+import com.civicledger.service.EncryptionService.EncryptionResult;
+import com.civicledger.service.HashingService;
+import com.civicledger.service.StorageService;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -19,21 +24,33 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.nio.charset.StandardCharsets;
+import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/documents")
+@Slf4j
 public class DocumentController {
 
     private final DocumentRepository documentRepository;
     private final AuditService auditService;
+    private final EncryptionService encryptionService;
+    private final HashingService hashingService;
+    private final StorageService storageService;
 
-    public DocumentController(DocumentRepository documentRepository, AuditService auditService) {
+    public DocumentController(
+            DocumentRepository documentRepository,
+            AuditService auditService,
+            EncryptionService encryptionService,
+            HashingService hashingService,
+            StorageService storageService) {
         this.documentRepository = documentRepository;
         this.auditService = auditService;
+        this.encryptionService = encryptionService;
+        this.hashingService = hashingService;
+        this.storageService = storageService;
     }
 
     @GetMapping
@@ -81,48 +98,73 @@ public class DocumentController {
             HttpServletRequest request) {
         return documentRepository.findByIdAndDeletedFalse(id)
                 .map(doc -> {
-                    // Log the download
-                    auditService.log(
-                            ActionType.DOCUMENT_DOWNLOAD,
-                            "DOCUMENT",
-                            id.toString(),
-                            AuditStatus.SUCCESS,
-                            "Downloaded document: " + doc.getOriginalFilename(),
-                            getClientIp(request),
-                            request.getHeader("User-Agent")
-                    );
+                    try {
+                        // Step 1: Retrieve encrypted data from storage
+                        byte[] encryptedData = storageService.retrieve(doc.getStoragePath());
+                        log.debug("Retrieved {} bytes of encrypted data for document {}",
+                                encryptedData.length, id);
 
-                    // TODO: Implement actual file retrieval and decryption
-                    // For now, return a placeholder response
-                    String placeholderContent = String.format(
-                            "CivicLedger Document Placeholder\n" +
-                            "================================\n\n" +
-                            "Document ID: %s\n" +
-                            "Filename: %s\n" +
-                            "Classification: %s\n" +
-                            "Original Size: %d bytes\n\n" +
-                            "Note: File storage and encryption not yet implemented.\n" +
-                            "In production, this would return the decrypted document.\n",
-                            doc.getId(),
-                            doc.getOriginalFilename(),
-                            doc.getClassificationLevel(),
-                            doc.getOriginalSize()
-                    );
+                        // Step 2: Decrypt the data
+                        byte[] iv = encryptionService.decodeFromBase64(doc.getEncryptionIv());
+                        byte[] decryptedData = encryptionService.decrypt(encryptedData, iv);
+                        log.debug("Decrypted to {} bytes", decryptedData.length);
 
-                    ByteArrayResource resource = new ByteArrayResource(
-                            placeholderContent.getBytes(StandardCharsets.UTF_8));
+                        // Step 3: Verify integrity with SHA-256 hash
+                        String computedHash = hashingService.hash(decryptedData);
+                        if (!hashingService.verify(decryptedData, doc.getFileHash())) {
+                            log.error("Hash verification failed for document {}. Expected: {}, Got: {}",
+                                    id, doc.getFileHash(), computedHash);
+                            auditService.log(
+                                    ActionType.DOCUMENT_DOWNLOAD,
+                                    "DOCUMENT",
+                                    id.toString(),
+                                    AuditStatus.FAILURE,
+                                    "INTEGRITY VIOLATION: Hash mismatch detected for " + doc.getOriginalFilename(),
+                                    getClientIp(request),
+                                    request.getHeader("User-Agent")
+                            );
+                            return ResponseEntity.status(500)
+                                    .<Resource>body(null);
+                        }
 
-                    String filename = doc.getOriginalFilename();
-                    String contentType = doc.getContentType() != null
-                            ? doc.getContentType()
-                            : MediaType.APPLICATION_OCTET_STREAM_VALUE;
+                        // Log successful download
+                        auditService.log(
+                                ActionType.DOCUMENT_DOWNLOAD,
+                                "DOCUMENT",
+                                id.toString(),
+                                AuditStatus.SUCCESS,
+                                "Downloaded document: " + doc.getOriginalFilename() + " (hash verified)",
+                                getClientIp(request),
+                                request.getHeader("User-Agent")
+                        );
 
-                    return ResponseEntity.ok()
-                            .header(HttpHeaders.CONTENT_DISPOSITION,
-                                    "attachment; filename=\"" + filename + "\"")
-                            .contentType(MediaType.parseMediaType(contentType))
-                            .contentLength(resource.contentLength())
-                            .body((Resource) resource);
+                        ByteArrayResource resource = new ByteArrayResource(decryptedData);
+
+                        String filename = doc.getOriginalFilename();
+                        String contentType = doc.getContentType() != null
+                                ? doc.getContentType()
+                                : MediaType.APPLICATION_OCTET_STREAM_VALUE;
+
+                        return ResponseEntity.ok()
+                                .header(HttpHeaders.CONTENT_DISPOSITION,
+                                        "attachment; filename=\"" + filename + "\"")
+                                .contentType(MediaType.parseMediaType(contentType))
+                                .contentLength(resource.contentLength())
+                                .body((Resource) resource);
+
+                    } catch (Exception e) {
+                        log.error("Failed to download document {}: {}", id, e.getMessage(), e);
+                        auditService.log(
+                                ActionType.DOCUMENT_DOWNLOAD,
+                                "DOCUMENT",
+                                id.toString(),
+                                AuditStatus.FAILURE,
+                                "Failed to download document: " + e.getMessage(),
+                                getClientIp(request),
+                                request.getHeader("User-Agent")
+                        );
+                        return ResponseEntity.internalServerError().<Resource>build();
+                    }
                 })
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -135,40 +177,73 @@ public class DocumentController {
             @AuthenticationPrincipal User user,
             HttpServletRequest request) {
 
-        // TODO: Implement actual file encryption and storage
-        // For now, create a placeholder document record
-        Document document = Document.builder()
-                .originalFilename(file.getOriginalFilename())
-                .contentType(file.getContentType())
-                .originalSize(file.getSize())
-                .encryptedSize(file.getSize())
-                .fileHash("placeholder-hash-" + UUID.randomUUID())
-                .encryptionIv("placeholder-iv")
-                .storagePath("/documents/" + UUID.randomUUID())
-                .uploadedBy(user.getId().toString())
-                .description(description)
-                .classificationLevel(classificationLevel != null
-                        ? User.ClassificationLevel.valueOf(classificationLevel)
-                        : User.ClassificationLevel.UNCLASSIFIED)
-                .createdAt(Instant.now())
-                .build();
+        try {
+            // Read file bytes
+            byte[] fileBytes = file.getBytes();
 
-        Document saved = documentRepository.save(document);
+            // Step 1: Calculate SHA-256 hash of original file (for integrity verification)
+            String fileHash = hashingService.hash(fileBytes);
+            log.debug("Calculated SHA-256 hash for {}: {}", file.getOriginalFilename(), fileHash);
 
-        // Log the upload
-        auditService.log(
-                ActionType.DOCUMENT_UPLOAD,
-                "DOCUMENT",
-                saved.getId().toString(),
-                AuditStatus.SUCCESS,
-                String.format("Uploaded document: %s (size: %d bytes, classification: %s)",
-                        file.getOriginalFilename(), file.getSize(),
-                        saved.getClassificationLevel()),
-                getClientIp(request),
-                request.getHeader("User-Agent")
-        );
+            // Step 2: Encrypt file content with AES-256-GCM
+            EncryptionResult encryptionResult = encryptionService.encrypt(fileBytes);
+            log.debug("Encrypted {} bytes -> {} bytes ciphertext",
+                    fileBytes.length, encryptionResult.ciphertext().length);
 
-        return ResponseEntity.ok(toDTO(saved));
+            // Step 3: Store encrypted data
+            String storagePath = storageService.store(
+                    encryptionResult.ciphertext(),
+                    file.getOriginalFilename()
+            );
+            log.debug("Stored encrypted file at: {}", storagePath);
+
+            // Step 4: Create document record with actual cryptographic values
+            Document document = Document.builder()
+                    .originalFilename(file.getOriginalFilename())
+                    .contentType(file.getContentType())
+                    .originalSize(file.getSize())
+                    .encryptedSize((long) encryptionResult.ciphertext().length)
+                    .fileHash(fileHash)
+                    .encryptionIv(encryptionResult.ivBase64())
+                    .storagePath(storagePath)
+                    .uploadedBy(user.getId().toString())
+                    .description(description)
+                    .classificationLevel(classificationLevel != null
+                            ? User.ClassificationLevel.valueOf(classificationLevel)
+                            : User.ClassificationLevel.UNCLASSIFIED)
+                    .createdAt(Instant.now())
+                    .build();
+
+            Document saved = documentRepository.save(document);
+
+            // Log the upload
+            auditService.log(
+                    ActionType.DOCUMENT_UPLOAD,
+                    "DOCUMENT",
+                    saved.getId().toString(),
+                    AuditStatus.SUCCESS,
+                    String.format("Uploaded document: %s (size: %d bytes, hash: %s, classification: %s)",
+                            file.getOriginalFilename(), file.getSize(), fileHash.substring(0, 16) + "...",
+                            saved.getClassificationLevel()),
+                    getClientIp(request),
+                    request.getHeader("User-Agent")
+            );
+
+            return ResponseEntity.ok(toDTO(saved));
+
+        } catch (IOException e) {
+            log.error("Failed to read uploaded file: {}", file.getOriginalFilename(), e);
+            auditService.log(
+                    ActionType.DOCUMENT_UPLOAD,
+                    "DOCUMENT",
+                    null,
+                    AuditStatus.FAILURE,
+                    "Failed to upload document: " + file.getOriginalFilename() + " - " + e.getMessage(),
+                    getClientIp(request),
+                    request.getHeader("User-Agent")
+            );
+            return ResponseEntity.internalServerError().build();
+        }
     }
 
     @DeleteMapping("/{id}")

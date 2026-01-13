@@ -60,8 +60,10 @@ public class SecurityConfig {
             .sessionManagement(session -> session
                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                // Public endpoints
-                .requestMatchers("/api/health/**", "/actuator/health/**").permitAll()
+                // Public endpoints - health probes for Kubernetes
+                .requestMatchers("/api/health/**", "/health/**", "/actuator/health/**").permitAll()
+                // OpenAPI / Swagger documentation
+                .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**", "/v3/api-docs.yaml").permitAll()
                 .requestMatchers("/api/auth/login", "/api/auth/logout", "/api/auth/refresh").permitAll()
                 // Authenticated user info
                 .requestMatchers("/api/auth/me").authenticated()
