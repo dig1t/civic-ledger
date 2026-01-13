@@ -108,4 +108,10 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
      */
     @Query("SELECT SUM(d.encryptedSize) FROM Document d WHERE d.deleted = false")
     Long getTotalStorageUsed();
+
+    /**
+     * Count documents created after a given timestamp.
+     */
+    @Query("SELECT COUNT(d) FROM Document d WHERE d.deleted = false AND d.createdAt >= :since")
+    long countByCreatedAtAfter(@Param("since") Instant since);
 }

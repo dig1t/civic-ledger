@@ -2,12 +2,12 @@
 
 import { useState, type FormEvent } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 
 export default function LoginPage() {
-  const router = useRouter();
+  const { login } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -22,29 +22,7 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/auth/login`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            email: formData.email,
-            password: formData.password,
-            mfaCode: formData.mfaCode || undefined,
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.message || 'Authentication failed');
-      }
-
-      const data = await response.json();
-      localStorage.setItem('token', data.accessToken);
-      router.push('/dashboard');
+      await login(formData.email, formData.password, formData.mfaCode);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {

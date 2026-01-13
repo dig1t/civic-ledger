@@ -3,14 +3,17 @@ package com.civicledger.controller;
 import com.civicledger.dto.ApiError;
 import com.civicledger.dto.LoginRequest;
 import com.civicledger.dto.LoginResponse;
+import com.civicledger.entity.User;
 import com.civicledger.exception.AuthenticationException;
 import com.civicledger.service.AuthenticationService;
+import com.civicledger.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -25,9 +28,11 @@ public class AuthController {
     private static final Logger log = LoggerFactory.getLogger(AuthController.class);
 
     private final AuthenticationService authenticationService;
+    private final UserService userService;
 
-    public AuthController(AuthenticationService authenticationService) {
+    public AuthController(AuthenticationService authenticationService, UserService userService) {
         this.authenticationService = authenticationService;
+        this.userService = userService;
     }
 
     /**
@@ -44,6 +49,30 @@ public class AuthController {
 
         LoginResponse response = authenticationService.authenticate(request, ipAddress);
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Get current authenticated user's information.
+     */
+    @GetMapping("/me")
+    public ResponseEntity<LoginResponse.UserDTO> getCurrentUser(@AuthenticationPrincipal User user) {
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        LoginResponse.UserDTO userDTO = LoginResponse.UserDTO.builder()
+                .id(user.getId().toString())
+                .email(user.getEmail())
+                .fullName(user.getFullName())
+                .roles(user.getRoles().stream()
+                        .map(role -> role.name())
+                        .collect(java.util.stream.Collectors.toSet()))
+                .clearanceLevel(user.getClearanceLevel() != null
+                        ? user.getClearanceLevel().name()
+                        : null)
+                .build();
+
+        return ResponseEntity.ok(userDTO);
     }
 
     /**
