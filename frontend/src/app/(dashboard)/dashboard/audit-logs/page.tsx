@@ -12,6 +12,7 @@ import {
 // Backend returns a plain array of audit logs
 
 export default function AuditLogsPage() {
+  // Role check - redirects to /unauthorized if not AUDITOR or ADMINISTRATOR
   const { isAuthorized } = useRequireAuth('AUDITOR', 'ADMINISTRATOR');
   const [logs, setLogs] = useState<AuditLogEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -79,6 +80,7 @@ export default function AuditLogsPage() {
     loadLogs(true, cursor);
   };
 
+  // Role check in progress or unauthorized - useRequireAuth handles redirect
   if (!isAuthorized) {
     return null;
   }

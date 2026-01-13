@@ -6,6 +6,7 @@ import { api } from '@/lib/api';
 import { DocumentList, type Document } from '@/components/documents';
 
 export default function DocumentsPage() {
+  // Role check - redirects to /unauthorized if not OFFICER or ADMINISTRATOR
   const { isAuthorized } = useRequireAuth('OFFICER', 'ADMINISTRATOR');
   const [documents, setDocuments] = useState<Document[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -58,6 +59,7 @@ export default function DocumentsPage() {
     }
   }
 
+  // Role check in progress or unauthorized - useRequireAuth handles redirect
   if (!isAuthorized) {
     return null;
   }

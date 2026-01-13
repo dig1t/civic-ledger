@@ -37,25 +37,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const { showToast } = useToast();
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
-  // Handle auth failure events from API
-  const handleAuthFailure = useCallback((message: string) => {
-    localStorage.removeItem('token');
-    setUser(null);
-    showToast(message, 'error');
-    router.push('/login');
-  }, [router, showToast]);
-
-  // Subscribe to auth events
+  // Subscribe to auth events - handle auth failures from API
   useEffect(() => {
     const unsubscribe = authEvents.subscribe((event) => {
-      if (event.type === 'auth:failure') {
-        handleAuthFailure(event.message || 'Authentication failed');
+      if (event.type === 'auth:failure' && !isRedirecting) {
+        setIsRedirecting(true);
+        localStorage.removeItem('token');
+        setUser(null);
+        showToast(event.message || 'Authentication failed', 'error');
+        router.push('/login');
       }
     });
 
     return unsubscribe;
-  }, [handleAuthFailure]);
+  }, [router, showToast, isRedirecting]);
 
   // Load user on mount
   useEffect(() => {

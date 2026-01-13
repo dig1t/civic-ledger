@@ -9,6 +9,7 @@ import { FormField } from '@/components/ui';
 type ClassificationLevel = 'UNCLASSIFIED' | 'CONFIDENTIAL' | 'SECRET' | 'TOP_SECRET';
 
 export default function UploadPage() {
+  // Role check - redirects to /unauthorized if not OFFICER or ADMINISTRATOR
   const { isAuthorized } = useRequireAuth('OFFICER', 'ADMINISTRATOR');
   const [classification, setClassification] = useState<ClassificationLevel>('UNCLASSIFIED');
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -21,6 +22,7 @@ export default function UploadPage() {
     });
   }
 
+  // Role check in progress or unauthorized - useRequireAuth handles redirect
   if (!isAuthorized) {
     return null;
   }
