@@ -2,6 +2,7 @@
 
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useState,
@@ -9,6 +10,8 @@ import {
 } from 'react';
 import { useRouter } from 'next/navigation';
 import { api, ApiError } from './api';
+import { authEvents } from './auth-events';
+import { useToast } from '@/components/ui/toast';
 
 export type UserRole = 'ADMINISTRATOR' | 'OFFICER' | 'AUDITOR';
 
@@ -31,9 +34,30 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
+  const { showToast } = useToast();
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Handle auth failure events from API
+  const handleAuthFailure = useCallback((message: string) => {
+    localStorage.removeItem('token');
+    setUser(null);
+    showToast(message, 'error');
+    router.push('/login');
+  }, [router, showToast]);
+
+  // Subscribe to auth events
+  useEffect(() => {
+    const unsubscribe = authEvents.subscribe((event) => {
+      if (event.type === 'auth:failure') {
+        handleAuthFailure(event.message || 'Authentication failed');
+      }
+    });
+
+    return unsubscribe;
+  }, [handleAuthFailure]);
+
+  // Load user on mount
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (token) {
@@ -95,6 +119,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   function logout() {
     localStorage.removeItem('token');
     setUser(null);
+    showToast('You have been logged out', 'info');
     router.push('/login');
   }
 
