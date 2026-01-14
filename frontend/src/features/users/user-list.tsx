@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { cn } from '@/util/utils';
 import { Button, Input } from '@/components';
 import type { UserRole } from '@/util/auth';
@@ -82,6 +82,17 @@ export function UserList({
 }: UserListProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<UserRole | ''>('');
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const handleCopyId = useCallback(async (userId: string) => {
+    try {
+      await navigator.clipboard.writeText(userId);
+      setCopiedId(userId);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch (err) {
+      console.error('Failed to copy ID:', err);
+    }
+  }, []);
 
   const handleFilter = (e: React.FormEvent) => {
     e.preventDefault();
@@ -276,6 +287,15 @@ export function UserList({
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleCopyId(user.id)}
+                        aria-label={`Copy user ID for ${user.fullName}`}
+                        title={user.id}
+                      >
+                        {copiedId === user.id ? 'Copied!' : 'Copy ID'}
+                      </Button>
                       {canViewAuditLogs && (
                         <Button
                           variant="ghost"
