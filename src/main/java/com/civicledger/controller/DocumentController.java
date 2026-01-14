@@ -5,6 +5,7 @@ import com.civicledger.entity.AuditLog.AuditStatus;
 import com.civicledger.entity.Document;
 import com.civicledger.entity.User;
 import com.civicledger.repository.DocumentRepository;
+import com.civicledger.security.ClearanceValidator;
 import com.civicledger.service.AuditService;
 import com.civicledger.service.EncryptionService;
 import com.civicledger.service.EncryptionService.EncryptionResult;
@@ -39,33 +40,40 @@ public class DocumentController {
     private final EncryptionService encryptionService;
     private final HashingService hashingService;
     private final StorageService storageService;
+    private final ClearanceValidator clearanceValidator;
 
     public DocumentController(
             DocumentRepository documentRepository,
             AuditService auditService,
             EncryptionService encryptionService,
             HashingService hashingService,
-            StorageService storageService) {
+            StorageService storageService,
+            ClearanceValidator clearanceValidator) {
         this.documentRepository = documentRepository;
         this.auditService = auditService;
         this.encryptionService = encryptionService;
         this.hashingService = hashingService;
         this.storageService = storageService;
+        this.clearanceValidator = clearanceValidator;
     }
 
     @GetMapping
     public ResponseEntity<List<DocumentDTO>> listDocuments(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
-            @RequestParam(required = false) String search) {
+            @RequestParam(required = false) String search,
+            @AuthenticationPrincipal User user) {
 
         PageRequest pageRequest = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        User.ClassificationLevel maxLevel = clearanceValidator.getMaxAccessibleLevel(user);
 
         Page<Document> documents;
         if (search != null && !search.isBlank()) {
-            documents = documentRepository.searchByFilename(search, pageRequest);
+            // Filter search results by clearance level
+            documents = documentRepository.searchByFilenameWithClearance(search, maxLevel, pageRequest);
         } else {
-            documents = documentRepository.findByDeletedFalse(pageRequest);
+            // Only show documents at or below user's clearance level
+            documents = documentRepository.findByClassificationLevelAtOrBelow(maxLevel, pageRequest);
         }
 
         List<DocumentDTO> dtos = documents.map(this::toDTO).getContent();
@@ -75,9 +83,25 @@ public class DocumentController {
     @GetMapping("/{id}")
     public ResponseEntity<DocumentDTO> getDocument(
             @PathVariable UUID id,
+            @AuthenticationPrincipal User user,
             HttpServletRequest request) {
         return documentRepository.findByIdAndDeletedFalse(id)
                 .map(doc -> {
+                    // Validate clearance before granting access
+                    if (!clearanceValidator.hasAccess(user, doc)) {
+                        auditService.log(
+                                ActionType.DOCUMENT_ACCESS_DENIED,
+                                "DOCUMENT",
+                                id.toString(),
+                                AuditStatus.DENIED,
+                                String.format("Access denied: user clearance %s, required %s",
+                                        user.getClearanceLevel(), doc.getClassificationLevel()),
+                                getClientIp(request),
+                                request.getHeader("User-Agent")
+                        );
+                        clearanceValidator.validateAccess(user, doc); // Throws exception
+                    }
+
                     auditService.log(
                             ActionType.DOCUMENT_VIEW,
                             "DOCUMENT",
@@ -95,9 +119,25 @@ public class DocumentController {
     @GetMapping("/{id}/download")
     public ResponseEntity<Resource> downloadDocument(
             @PathVariable UUID id,
+            @AuthenticationPrincipal User user,
             HttpServletRequest request) {
         return documentRepository.findByIdAndDeletedFalse(id)
                 .map(doc -> {
+                    // Validate clearance BEFORE any decryption operations (fail fast)
+                    if (!clearanceValidator.hasAccess(user, doc)) {
+                        auditService.log(
+                                ActionType.DOCUMENT_ACCESS_DENIED,
+                                "DOCUMENT",
+                                id.toString(),
+                                AuditStatus.DENIED,
+                                String.format("Download denied: user clearance %s, required %s",
+                                        user.getClearanceLevel(), doc.getClassificationLevel()),
+                                getClientIp(request),
+                                request.getHeader("User-Agent")
+                        );
+                        clearanceValidator.validateAccess(user, doc); // Throws exception
+                    }
+
                     try {
                         // Step 1: Retrieve encrypted data from storage
                         byte[] encryptedData = storageService.retrieve(doc.getStoragePath());

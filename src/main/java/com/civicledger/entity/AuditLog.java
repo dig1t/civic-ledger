@@ -94,6 +94,7 @@ public class AuditLog {
         DOCUMENT_VIEW,
         DOCUMENT_DELETE,
         DOCUMENT_UPDATE,
+        DOCUMENT_ACCESS_DENIED,
 
         // Administrative actions
         USER_CREATE,

@@ -77,6 +77,15 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
     Page<Document> searchByFilename(@Param("query") String query, Pageable pageable);
 
     /**
+     * Search documents by filename with clearance filtering.
+     */
+    @Query("SELECT d FROM Document d WHERE d.deleted = false AND d.classificationLevel <= :maxLevel AND LOWER(d.originalFilename) LIKE LOWER(CONCAT('%', :query, '%'))")
+    Page<Document> searchByFilenameWithClearance(
+            @Param("query") String query,
+            @Param("maxLevel") ClassificationLevel maxLevel,
+            Pageable pageable);
+
+    /**
      * Find documents created within a date range.
      */
     @Query("SELECT d FROM Document d WHERE d.deleted = false AND d.createdAt BETWEEN :start AND :end ORDER BY d.createdAt DESC")
