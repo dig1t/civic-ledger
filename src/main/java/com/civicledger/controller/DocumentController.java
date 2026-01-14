@@ -153,17 +153,33 @@ public class DocumentController {
                     }
 
                     try {
-                        // Step 1: Retrieve encrypted data from storage
+                        // Step 1: Check if file exists in storage
+                        if (!storageService.exists(doc.getStoragePath())) {
+                            log.error("Document file not found in storage: {} (path: {})",
+                                    id, doc.getStoragePath());
+                            auditService.log(
+                                    ActionType.DOCUMENT_DOWNLOAD,
+                                    "DOCUMENT",
+                                    id.toString(),
+                                    AuditStatus.FAILURE,
+                                    "File not found in storage: " + doc.getOriginalFilename(),
+                                    getClientIp(request),
+                                    request.getHeader("User-Agent")
+                            );
+                            return ResponseEntity.notFound().build();
+                        }
+
+                        // Step 2: Retrieve encrypted data from storage
                         byte[] encryptedData = storageService.retrieve(doc.getStoragePath());
                         log.debug("Retrieved {} bytes of encrypted data for document {}",
                                 encryptedData.length, id);
 
-                        // Step 2: Decrypt the data
+                        // Step 3: Decrypt the data
                         byte[] iv = encryptionService.decodeFromBase64(doc.getEncryptionIv());
                         byte[] decryptedData = encryptionService.decrypt(encryptedData, iv);
                         log.debug("Decrypted to {} bytes", decryptedData.length);
 
-                        // Step 3: Verify integrity with SHA-256 hash
+                        // Step 4: Verify integrity with SHA-256 hash
                         String computedHash = hashingService.hash(decryptedData);
                         if (!hashingService.verify(decryptedData, doc.getFileHash())) {
                             log.error("Hash verification failed for document {}. Expected: {}, Got: {}",
