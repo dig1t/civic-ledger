@@ -5,6 +5,7 @@ import com.civicledger.entity.AuditLog.ActionType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -18,7 +19,7 @@ import java.util.UUID;
  * Note: Only insert operations should be used. Updates and deletes violate WORM compliance.
  */
 @Repository
-public interface AuditLogRepository extends JpaRepository<AuditLog, UUID> {
+public interface AuditLogRepository extends JpaRepository<AuditLog, UUID>, JpaSpecificationExecutor<AuditLog> {
 
     /**
      * Find all audit logs for a specific user.
@@ -73,4 +74,9 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, UUID> {
      */
     @Query("SELECT a FROM AuditLog a WHERE a.resourceType = 'DOCUMENT' AND a.resourceId = :documentId ORDER BY a.timestamp ASC")
     List<AuditLog> findDocumentAuditTrail(@Param("documentId") String documentId);
+
+    /**
+     * Count audit logs after a given timestamp.
+     */
+    long countByTimestampAfter(Instant since);
 }

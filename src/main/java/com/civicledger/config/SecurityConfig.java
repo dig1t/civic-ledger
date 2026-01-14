@@ -60,13 +60,24 @@ public class SecurityConfig {
             .sessionManagement(session -> session
                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                // Public endpoints
-                .requestMatchers("/api/health/**", "/actuator/health/**").permitAll()
-                .requestMatchers("/api/auth/**").permitAll()
+                // Public endpoints - health probes for Kubernetes
+                .requestMatchers("/api/health/**", "/health/**", "/actuator/health/**").permitAll()
+                // OpenAPI / Swagger documentation
+                .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**", "/v3/api-docs.yaml").permitAll()
+                .requestMatchers("/api/auth/login", "/api/auth/logout", "/api/auth/refresh").permitAll()
+                // Authenticated user info
+                .requestMatchers("/api/auth/me").authenticated()
+                // Dashboard - any authenticated user
+                .requestMatchers("/api/dashboard/**").authenticated()
                 // Role-based access
                 .requestMatchers("/api/admin/**").hasRole("ADMINISTRATOR")
                 .requestMatchers("/api/documents/**").hasAnyRole("OFFICER", "ADMINISTRATOR")
-                .requestMatchers("/api/audit/**").hasAnyRole("AUDITOR", "ADMINISTRATOR")
+                .requestMatchers("/api/audit-logs/**", "/api/audit/**").hasAnyRole("AUDITOR", "ADMINISTRATOR")
+                // User management - read access for all authenticated, write access for admin only
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/users", "/api/users/**").authenticated()
+                .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/users").hasRole("ADMINISTRATOR")
+                .requestMatchers(org.springframework.http.HttpMethod.PUT, "/api/users/**").hasRole("ADMINISTRATOR")
+                .requestMatchers(org.springframework.http.HttpMethod.DELETE, "/api/users/**").hasRole("ADMINISTRATOR")
                 .anyRequest().authenticated());
 
         // Configure authentication based on mode
@@ -103,15 +114,16 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList("http://localhost:3000", "http://localhost:5173"));
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Requested-With"));
+        // Allow any localhost port for development
+        configuration.setAllowedOriginPatterns(Arrays.asList("http://localhost:*", "http://127.0.0.1:*"));
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
+        configuration.setAllowedHeaders(Arrays.asList("*"));
         configuration.setExposedHeaders(Arrays.asList("Authorization"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/api/**", configuration);
+        source.registerCorsConfiguration("/**", configuration);
         return source;
     }
 

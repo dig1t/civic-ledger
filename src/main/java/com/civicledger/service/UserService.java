@@ -11,6 +11,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -190,5 +193,87 @@ public class UserService {
     @Transactional(readOnly = true)
     public boolean isEmailAvailable(String email) {
         return !userRepository.existsByEmail(email);
+    }
+
+    /**
+     * Check if email is available for a user other than the specified one.
+     */
+    @Transactional(readOnly = true)
+    public boolean isEmailAvailableForUser(String email, UUID userId) {
+        return userRepository.findByEmail(email)
+                .map(existingUser -> existingUser.getId().equals(userId))
+                .orElse(true);
+    }
+
+    /**
+     * Get all users with pagination.
+     */
+    @Transactional(readOnly = true)
+    public Page<User> findAllPaginated(Pageable pageable) {
+        return userRepository.findAll(pageable);
+    }
+
+    /**
+     * Search users by name or email with pagination.
+     */
+    @Transactional(readOnly = true)
+    public Page<User> searchUsers(String search, Pageable pageable) {
+        return userRepository.searchUsers(search, pageable);
+    }
+
+    /**
+     * Update user details.
+     */
+    @Transactional
+    @Auditable(action = ActionType.USER_UPDATE, resourceType = "USER", resourceIdExpression = "#userId.toString()")
+    public User updateUser(UUID userId, String email, String firstName, String lastName,
+                          String password, Set<Role> roles) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
+
+        // Check if email is available for this user
+        if (!isEmailAvailableForUser(email, userId)) {
+            throw new IllegalArgumentException("Email already in use: " + email);
+        }
+
+        user.setEmail(email);
+        user.setFirstName(firstName);
+        user.setLastName(lastName);
+        user.setRoles(roles);
+
+        // Only update password if provided
+        if (password != null && !password.isBlank()) {
+            user.setPasswordHash(passwordEncoder.encode(password));
+        }
+
+        log.info("Updated user: {} with roles: {}", email, roles);
+        return userRepository.save(user);
+    }
+
+    /**
+     * Activate user account.
+     */
+    @Transactional
+    @Auditable(action = ActionType.USER_UPDATE, resourceType = "USER", resourceIdExpression = "#userId.toString()")
+    public void activateUser(UUID userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
+
+        user.setActive(true);
+        userRepository.save(user);
+        log.info("Activated user: {}", user.getEmail());
+    }
+
+    /**
+     * Delete user permanently.
+     */
+    @Transactional
+    @Auditable(action = ActionType.USER_DELETE, resourceType = "USER", resourceIdExpression = "#userId.toString()")
+    public void deleteUser(UUID userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
+
+        userRepository.delete(user);
+        log.info("Deleted user: {}", user.getEmail());
     }
 }
