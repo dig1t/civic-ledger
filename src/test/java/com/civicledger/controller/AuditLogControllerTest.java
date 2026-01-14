@@ -116,8 +116,9 @@ class AuditLogControllerTest {
         void shouldReturnAllLogs() throws Exception {
             mockMvc.perform(get("/api/audit-logs"))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$", hasSize(5)))
-                    .andExpect(jsonPath("$[*].actionType", containsInAnyOrder(
+                    .andExpect(jsonPath("$.content", hasSize(5)))
+                    .andExpect(jsonPath("$.totalElements", is(5)))
+                    .andExpect(jsonPath("$.content[*].actionType", containsInAnyOrder(
                             "LOGIN_SUCCESS", "LOGIN_FAILURE", "DOCUMENT_UPLOAD",
                             "DOCUMENT_DOWNLOAD", "USER_CREATE")));
         }
@@ -150,9 +151,9 @@ class AuditLogControllerTest {
             mockMvc.perform(get("/api/audit-logs")
                             .param("actionType", "LOGIN_SUCCESS"))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$", hasSize(1)))
-                    .andExpect(jsonPath("$[0].actionType", is("LOGIN_SUCCESS")))
-                    .andExpect(jsonPath("$[0].userId", is("user1")));
+                    .andExpect(jsonPath("$.content", hasSize(1)))
+                    .andExpect(jsonPath("$.content[0].actionType", is("LOGIN_SUCCESS")))
+                    .andExpect(jsonPath("$.content[0].userId", is("user1")));
         }
 
         @Test
@@ -162,9 +163,9 @@ class AuditLogControllerTest {
             mockMvc.perform(get("/api/audit-logs")
                             .param("actionType", "DOCUMENT_UPLOAD"))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$", hasSize(1)))
-                    .andExpect(jsonPath("$[0].actionType", is("DOCUMENT_UPLOAD")))
-                    .andExpect(jsonPath("$[0].resourceId", is("doc-123")));
+                    .andExpect(jsonPath("$.content", hasSize(1)))
+                    .andExpect(jsonPath("$.content[0].actionType", is("DOCUMENT_UPLOAD")))
+                    .andExpect(jsonPath("$.content[0].resourceId", is("doc-123")));
         }
 
         @Test
@@ -174,7 +175,8 @@ class AuditLogControllerTest {
             mockMvc.perform(get("/api/audit-logs")
                             .param("actionType", "LOGOUT"))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$", hasSize(0)));
+                    .andExpect(jsonPath("$.content", hasSize(0)))
+                    .andExpect(jsonPath("$.totalElements", is(0)));
         }
 
         @Test
@@ -184,7 +186,7 @@ class AuditLogControllerTest {
             mockMvc.perform(get("/api/audit-logs")
                             .param("actionType", "INVALID_TYPE"))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$", hasSize(5))); // Returns all logs
+                    .andExpect(jsonPath("$.content", hasSize(5))); // Returns all logs
         }
     }
 
@@ -199,8 +201,8 @@ class AuditLogControllerTest {
             mockMvc.perform(get("/api/audit-logs")
                             .param("userId", "user1"))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$", hasSize(2)))
-                    .andExpect(jsonPath("$[*].userId", everyItem(is("user1"))));
+                    .andExpect(jsonPath("$.content", hasSize(2)))
+                    .andExpect(jsonPath("$.content[*].userId", everyItem(is("user1"))));
         }
 
         @Test
@@ -210,8 +212,8 @@ class AuditLogControllerTest {
             mockMvc.perform(get("/api/audit-logs")
                             .param("userId", "user2"))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$", hasSize(2)))
-                    .andExpect(jsonPath("$[*].userId", everyItem(is("user2"))));
+                    .andExpect(jsonPath("$.content", hasSize(2)))
+                    .andExpect(jsonPath("$.content[*].userId", everyItem(is("user2"))));
         }
 
         @Test
@@ -221,7 +223,8 @@ class AuditLogControllerTest {
             mockMvc.perform(get("/api/audit-logs")
                             .param("userId", "nonexistent"))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$", hasSize(0)));
+                    .andExpect(jsonPath("$.content", hasSize(0)))
+                    .andExpect(jsonPath("$.totalElements", is(0)));
         }
     }
 
@@ -239,7 +242,7 @@ class AuditLogControllerTest {
                             .param("startDate", today)
                             .param("endDate", today))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$", hasSize(3))); // 3 logs created today
+                    .andExpect(jsonPath("$.content", hasSize(3))); // 3 logs created today
         }
 
         @Test
@@ -253,7 +256,7 @@ class AuditLogControllerTest {
                             .param("startDate", lastWeek)
                             .param("endDate", today))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$", hasSize(5))); // All logs
+                    .andExpect(jsonPath("$.content", hasSize(5))); // All logs
         }
 
         @Test
@@ -267,7 +270,8 @@ class AuditLogControllerTest {
                             .param("startDate", tomorrow)
                             .param("endDate", nextWeek))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$", hasSize(0)));
+                    .andExpect(jsonPath("$.content", hasSize(0)))
+                    .andExpect(jsonPath("$.totalElements", is(0)));
         }
     }
 
@@ -283,9 +287,9 @@ class AuditLogControllerTest {
                             .param("actionType", "LOGIN_SUCCESS")
                             .param("userId", "user1"))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$", hasSize(1)))
-                    .andExpect(jsonPath("$[0].actionType", is("LOGIN_SUCCESS")))
-                    .andExpect(jsonPath("$[0].userId", is("user1")));
+                    .andExpect(jsonPath("$.content", hasSize(1)))
+                    .andExpect(jsonPath("$.content[0].actionType", is("LOGIN_SUCCESS")))
+                    .andExpect(jsonPath("$.content[0].userId", is("user1")));
         }
 
         @Test
@@ -300,9 +304,9 @@ class AuditLogControllerTest {
                             .param("startDate", today)
                             .param("endDate", today))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$", hasSize(1)))
-                    .andExpect(jsonPath("$[0].actionType", is("DOCUMENT_UPLOAD")))
-                    .andExpect(jsonPath("$[0].userId", is("user2")));
+                    .andExpect(jsonPath("$.content", hasSize(1)))
+                    .andExpect(jsonPath("$.content[0].actionType", is("DOCUMENT_UPLOAD")))
+                    .andExpect(jsonPath("$.content[0].userId", is("user2")));
         }
 
         @Test
@@ -313,7 +317,7 @@ class AuditLogControllerTest {
                             .param("actionType", "DOCUMENT_UPLOAD")
                             .param("userId", "user1")) // user1 has no document uploads
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$", hasSize(0)));
+                    .andExpect(jsonPath("$.content", hasSize(0)));
         }
     }
 
@@ -328,7 +332,10 @@ class AuditLogControllerTest {
             mockMvc.perform(get("/api/audit-logs")
                             .param("size", "2"))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$", hasSize(2)));
+                    .andExpect(jsonPath("$.content", hasSize(2)))
+                    .andExpect(jsonPath("$.size", is(2)))
+                    .andExpect(jsonPath("$.totalElements", is(5)))
+                    .andExpect(jsonPath("$.totalPages", is(3)));
         }
 
         @Test
@@ -336,27 +343,30 @@ class AuditLogControllerTest {
         @DisplayName("Should return correct page")
         void shouldReturnCorrectPage() throws Exception {
             // Page 0 with size 2
-            MvcResult page0 = mockMvc.perform(get("/api/audit-logs")
+            mockMvc.perform(get("/api/audit-logs")
                             .param("page", "0")
                             .param("size", "2"))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$", hasSize(2)))
-                    .andReturn();
+                    .andExpect(jsonPath("$.content", hasSize(2)))
+                    .andExpect(jsonPath("$.page", is(0)))
+                    .andExpect(jsonPath("$.first", is(true)));
 
             // Page 1 with size 2
-            MvcResult page1 = mockMvc.perform(get("/api/audit-logs")
+            mockMvc.perform(get("/api/audit-logs")
                             .param("page", "1")
                             .param("size", "2"))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$", hasSize(2)))
-                    .andReturn();
+                    .andExpect(jsonPath("$.content", hasSize(2)))
+                    .andExpect(jsonPath("$.page", is(1)));
 
             // Page 2 with size 2 (should have 1 item)
             mockMvc.perform(get("/api/audit-logs")
                             .param("page", "2")
                             .param("size", "2"))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$", hasSize(1)));
+                    .andExpect(jsonPath("$.content", hasSize(1)))
+                    .andExpect(jsonPath("$.page", is(2)))
+                    .andExpect(jsonPath("$.last", is(true)));
         }
     }
 }

@@ -18,6 +18,11 @@ export interface Document {
 interface DocumentListProps {
   documents: Document[];
   isLoading?: boolean;
+  currentPage: number;
+  totalPages: number;
+  totalElements: number;
+  pageSize: number;
+  onPageChange: (page: number) => void;
   onDownload?: (doc: Document) => void;
   onSearch?: (query: string) => void;
 }
@@ -48,6 +53,11 @@ function formatDate(dateString: string): string {
 export function DocumentList({
   documents,
   isLoading,
+  currentPage,
+  totalPages,
+  totalElements,
+  pageSize,
+  onPageChange,
   onDownload,
   onSearch,
 }: DocumentListProps) {
@@ -57,6 +67,19 @@ export function DocumentList({
     e.preventDefault();
     onSearch?.(searchQuery);
   };
+
+  const pageNumbers = [];
+  const maxVisiblePages = 5;
+  let startPage = Math.max(0, currentPage - Math.floor(maxVisiblePages / 2));
+  const endPage = Math.min(totalPages, startPage + maxVisiblePages);
+
+  if (endPage - startPage < maxVisiblePages) {
+    startPage = Math.max(0, endPage - maxVisiblePages);
+  }
+
+  for (let i = startPage; i < endPage; i++) {
+    pageNumbers.push(i);
+  }
 
   return (
     <div className="space-y-4">
@@ -82,7 +105,7 @@ export function DocumentList({
       <div aria-live="polite" className="sr-only">
         {isLoading
           ? 'Loading documents...'
-          : `${documents.length} documents found`}
+          : `${totalElements} documents found, showing page ${currentPage + 1} of ${totalPages}`}
       </div>
 
       {/* Document table */}
@@ -192,6 +215,66 @@ export function DocumentList({
           </tbody>
         </table>
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <nav aria-label="Document list pagination" className="flex items-center justify-between">
+          <p className="text-sm text-neutral-600">
+            Showing {currentPage * pageSize + 1} to {Math.min((currentPage + 1) * pageSize, totalElements)} of{' '}
+            {totalElements} documents
+          </p>
+          <div className="flex gap-1">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => onPageChange(0)}
+              disabled={currentPage === 0}
+              aria-label="Go to first page"
+            >
+              First
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => onPageChange(currentPage - 1)}
+              disabled={currentPage === 0}
+              aria-label="Go to previous page"
+            >
+              Previous
+            </Button>
+            {pageNumbers.map((page) => (
+              <Button
+                key={page}
+                variant={page === currentPage ? 'primary' : 'secondary'}
+                size="sm"
+                onClick={() => onPageChange(page)}
+                aria-label={`Go to page ${page + 1}`}
+                aria-current={page === currentPage ? 'page' : undefined}
+              >
+                {page + 1}
+              </Button>
+            ))}
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => onPageChange(currentPage + 1)}
+              disabled={currentPage >= totalPages - 1}
+              aria-label="Go to next page"
+            >
+              Next
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => onPageChange(totalPages - 1)}
+              disabled={currentPage >= totalPages - 1}
+              aria-label="Go to last page"
+            >
+              Last
+            </Button>
+          </div>
+        </nav>
+      )}
     </div>
   );
 }

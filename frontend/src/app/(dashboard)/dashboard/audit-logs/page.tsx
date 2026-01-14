@@ -8,26 +8,27 @@ import {
   type AuditLogEntry,
   type AuditLogFilters,
 } from '@/features/audit';
+import type { PaginatedResponse } from '@/types/api';
 
-// Backend returns a plain array of audit logs
+const PAGE_SIZE = 50;
 
 export default function AuditLogsPage() {
   // Role check - redirects to /unauthorized if not AUDITOR or ADMINISTRATOR
   const { isAuthorized } = useRequireAuth('AUDITOR', 'ADMINISTRATOR');
   const [logs, setLogs] = useState<AuditLogEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [hasMore, setHasMore] = useState(false);
-  const [cursor, setCursor] = useState<string | undefined>();
+  const [currentPage, setCurrentPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalElements, setTotalElements] = useState(0);
   const [filters, setFilters] = useState<AuditLogFilters>({});
 
   const loadLogs = useCallback(
-    async (append: boolean, currentCursor?: string) => {
+    async (page: number) => {
       setIsLoading(true);
       try {
         const params = new URLSearchParams();
-        if (append && currentCursor) {
-          params.set('cursor', currentCursor);
-        }
+        params.set('page', page.toString());
+        params.set('size', PAGE_SIZE.toString());
         if (filters.actionType) {
           params.set('actionType', filters.actionType);
         }
@@ -41,23 +42,17 @@ export default function AuditLogsPage() {
           params.set('endDate', filters.endDate);
         }
 
-        const queryString = params.toString();
-        const endpoint = `/audit-logs${queryString ? `?${queryString}` : ''}`;
-        const data = await api.get<AuditLogEntry[]>(endpoint);
+        const endpoint = `/audit-logs?${params.toString()}`;
+        const response = await api.get<PaginatedResponse<AuditLogEntry>>(endpoint);
 
-        if (append) {
-          setLogs((prev) => [...prev, ...data]);
-        } else {
-          setLogs(data);
-        }
-        // Backend doesn't support pagination yet
-        setHasMore(false);
-        setCursor(undefined);
+        setLogs(response.content || []);
+        setCurrentPage(response.page);
+        setTotalPages(response.totalPages);
+        setTotalElements(response.totalElements);
       } catch {
-        if (!append) {
-          setLogs([]);
-        }
-        setHasMore(false);
+        setLogs([]);
+        setTotalPages(0);
+        setTotalElements(0);
       } finally {
         setIsLoading(false);
       }
@@ -67,17 +62,17 @@ export default function AuditLogsPage() {
 
   useEffect(() => {
     if (isAuthorized) {
-      loadLogs(false);
+      loadLogs(0);
     }
   }, [isAuthorized, loadLogs]);
 
   const handleFilter = (newFilters: AuditLogFilters) => {
-    setCursor(undefined);
     setFilters(newFilters);
+    // loadLogs will be called via useEffect due to filters dependency
   };
 
-  const handleLoadMore = () => {
-    loadLogs(true, cursor);
+  const handlePageChange = (page: number) => {
+    loadLogs(page);
   };
 
   // Role check in progress or unauthorized - useRequireAuth handles redirect
@@ -107,8 +102,11 @@ export default function AuditLogsPage() {
       <AuditLogStream
         logs={logs}
         isLoading={isLoading}
-        hasMore={hasMore}
-        onLoadMore={handleLoadMore}
+        currentPage={currentPage}
+        totalPages={totalPages}
+        totalElements={totalElements}
+        pageSize={PAGE_SIZE}
+        onPageChange={handlePageChange}
         onFilter={handleFilter}
       />
     </div>

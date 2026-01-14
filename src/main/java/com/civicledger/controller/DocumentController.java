@@ -1,10 +1,12 @@
 package com.civicledger.controller;
 
+import com.civicledger.dto.PagedResponse;
 import com.civicledger.entity.AuditLog.ActionType;
 import com.civicledger.entity.AuditLog.AuditStatus;
 import com.civicledger.entity.Document;
 import com.civicledger.entity.User;
 import com.civicledger.repository.DocumentRepository;
+import com.civicledger.security.ClearanceValidator;
 import com.civicledger.service.AuditService;
 import com.civicledger.service.EncryptionService;
 import com.civicledger.service.EncryptionService.EncryptionResult;
@@ -15,11 +17,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
-import org.springframework.core.io.ByteArrayResource;
-import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -39,45 +40,81 @@ public class DocumentController {
     private final EncryptionService encryptionService;
     private final HashingService hashingService;
     private final StorageService storageService;
+    private final ClearanceValidator clearanceValidator;
 
     public DocumentController(
             DocumentRepository documentRepository,
             AuditService auditService,
             EncryptionService encryptionService,
             HashingService hashingService,
-            StorageService storageService) {
+            StorageService storageService,
+            ClearanceValidator clearanceValidator) {
         this.documentRepository = documentRepository;
         this.auditService = auditService;
         this.encryptionService = encryptionService;
         this.hashingService = hashingService;
         this.storageService = storageService;
+        this.clearanceValidator = clearanceValidator;
     }
 
     @GetMapping
-    public ResponseEntity<List<DocumentDTO>> listDocuments(
+    public ResponseEntity<PagedResponse<DocumentDTO>> listDocuments(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
-            @RequestParam(required = false) String search) {
+            @RequestParam(required = false) String search,
+            @AuthenticationPrincipal User user) {
+
+        if (user == null) {
+            log.warn("listDocuments called with null user - authentication may have failed");
+            return ResponseEntity.status(401).build();
+        }
+
+        log.debug("listDocuments: user={}, clearance={}, page={}, size={}, search={}",
+                user.getEmail(), user.getClearanceLevel(), page, size, search);
 
         PageRequest pageRequest = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        List<User.ClassificationLevel> allowedLevels = clearanceValidator.getAccessibleLevels(user.getClearanceLevel());
+
+        log.debug("listDocuments: allowedLevels={}", allowedLevels);
 
         Page<Document> documents;
         if (search != null && !search.isBlank()) {
-            documents = documentRepository.searchByFilename(search, pageRequest);
+            // Filter search results by clearance level
+            documents = documentRepository.searchByFilenameWithClearance(search, allowedLevels, pageRequest);
         } else {
-            documents = documentRepository.findByDeletedFalse(pageRequest);
+            // Only show documents at or below user's clearance level
+            documents = documentRepository.findByClassificationLevelIn(allowedLevels, pageRequest);
         }
 
-        List<DocumentDTO> dtos = documents.map(this::toDTO).getContent();
-        return ResponseEntity.ok(dtos);
+        log.debug("listDocuments: found {} documents (total: {})",
+                documents.getContent().size(), documents.getTotalElements());
+
+        PagedResponse<DocumentDTO> response = PagedResponse.fromPage(documents, this::toDTO);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<DocumentDTO> getDocument(
             @PathVariable UUID id,
+            @AuthenticationPrincipal User user,
             HttpServletRequest request) {
         return documentRepository.findByIdAndDeletedFalse(id)
                 .map(doc -> {
+                    // Validate clearance before granting access
+                    if (!clearanceValidator.hasAccess(user, doc)) {
+                        auditService.log(
+                                ActionType.DOCUMENT_ACCESS_DENIED,
+                                "DOCUMENT",
+                                id.toString(),
+                                AuditStatus.DENIED,
+                                String.format("Access denied: user clearance %s, required %s",
+                                        user.getClearanceLevel(), doc.getClassificationLevel()),
+                                getClientIp(request),
+                                request.getHeader("User-Agent")
+                        );
+                        clearanceValidator.validateAccess(user, doc); // Throws exception
+                    }
+
                     auditService.log(
                             ActionType.DOCUMENT_VIEW,
                             "DOCUMENT",
@@ -93,23 +130,55 @@ public class DocumentController {
     }
 
     @GetMapping("/{id}/download")
-    public ResponseEntity<Resource> downloadDocument(
+    public ResponseEntity<StreamingResponseBody> downloadDocument(
             @PathVariable UUID id,
+            @AuthenticationPrincipal User user,
             HttpServletRequest request) {
         return documentRepository.findByIdAndDeletedFalse(id)
                 .map(doc -> {
+                    // Validate clearance BEFORE any decryption operations (fail fast)
+                    if (!clearanceValidator.hasAccess(user, doc)) {
+                        auditService.log(
+                                ActionType.DOCUMENT_ACCESS_DENIED,
+                                "DOCUMENT",
+                                id.toString(),
+                                AuditStatus.DENIED,
+                                String.format("Download denied: user clearance %s, required %s",
+                                        user.getClearanceLevel(), doc.getClassificationLevel()),
+                                getClientIp(request),
+                                request.getHeader("User-Agent")
+                        );
+                        clearanceValidator.validateAccess(user, doc); // Throws exception
+                    }
+
                     try {
-                        // Step 1: Retrieve encrypted data from storage
+                        // Step 1: Check if file exists in storage
+                        if (!storageService.exists(doc.getStoragePath())) {
+                            log.error("Document file not found in storage: {} (path: {})",
+                                    id, doc.getStoragePath());
+                            auditService.log(
+                                    ActionType.DOCUMENT_DOWNLOAD,
+                                    "DOCUMENT",
+                                    id.toString(),
+                                    AuditStatus.FAILURE,
+                                    "File not found in storage: " + doc.getOriginalFilename(),
+                                    getClientIp(request),
+                                    request.getHeader("User-Agent")
+                            );
+                            return ResponseEntity.notFound().<StreamingResponseBody>build();
+                        }
+
+                        // Step 2: Retrieve encrypted data from storage
                         byte[] encryptedData = storageService.retrieve(doc.getStoragePath());
                         log.debug("Retrieved {} bytes of encrypted data for document {}",
                                 encryptedData.length, id);
 
-                        // Step 2: Decrypt the data
+                        // Step 3: Decrypt the data
                         byte[] iv = encryptionService.decodeFromBase64(doc.getEncryptionIv());
                         byte[] decryptedData = encryptionService.decrypt(encryptedData, iv);
                         log.debug("Decrypted to {} bytes", decryptedData.length);
 
-                        // Step 3: Verify integrity with SHA-256 hash
+                        // Step 4: Verify integrity with SHA-256 hash
                         String computedHash = hashingService.hash(decryptedData);
                         if (!hashingService.verify(decryptedData, doc.getFileHash())) {
                             log.error("Hash verification failed for document {}. Expected: {}, Got: {}",
@@ -123,24 +192,57 @@ public class DocumentController {
                                     getClientIp(request),
                                     request.getHeader("User-Agent")
                             );
-                            return ResponseEntity.status(500)
-                                    .<Resource>body(null);
+                            return ResponseEntity.status(500).<StreamingResponseBody>body(null);
                         }
 
-                        // Log successful download
+                        // Capture values for use in lambda
+                        String clientIp = getClientIp(request);
+                        String userAgent = request.getHeader("User-Agent");
+                        String filename = doc.getOriginalFilename();
+
+                        // Log download started
                         auditService.log(
-                                ActionType.DOCUMENT_DOWNLOAD,
+                                ActionType.DOCUMENT_DOWNLOAD_STARTED,
                                 "DOCUMENT",
                                 id.toString(),
                                 AuditStatus.SUCCESS,
-                                "Downloaded document: " + doc.getOriginalFilename() + " (hash verified)",
-                                getClientIp(request),
-                                request.getHeader("User-Agent")
+                                "Download started: " + filename + " (" + decryptedData.length + " bytes)",
+                                clientIp,
+                                userAgent
                         );
 
-                        ByteArrayResource resource = new ByteArrayResource(decryptedData);
+                        // Create streaming response to track transfer completion
+                        StreamingResponseBody stream = outputStream -> {
+                            try {
+                                outputStream.write(decryptedData);
+                                outputStream.flush();
+                                // Log completed AFTER all bytes written to client
+                                auditService.log(
+                                        ActionType.DOCUMENT_DOWNLOAD_COMPLETED,
+                                        "DOCUMENT",
+                                        id.toString(),
+                                        AuditStatus.SUCCESS,
+                                        "Download completed: " + filename + " (hash verified)",
+                                        clientIp,
+                                        userAgent
+                                );
+                                log.debug("Download completed for document {}", id);
+                            } catch (IOException e) {
+                                // Connection dropped mid-transfer
+                                log.warn("Download interrupted for document {}: {}", id, e.getMessage());
+                                auditService.log(
+                                        ActionType.DOCUMENT_DOWNLOAD,
+                                        "DOCUMENT",
+                                        id.toString(),
+                                        AuditStatus.FAILURE,
+                                        "Download interrupted: " + filename + " - " + e.getMessage(),
+                                        clientIp,
+                                        userAgent
+                                );
+                                throw e;
+                            }
+                        };
 
-                        String filename = doc.getOriginalFilename();
                         String contentType = doc.getContentType() != null
                                 ? doc.getContentType()
                                 : MediaType.APPLICATION_OCTET_STREAM_VALUE;
@@ -149,8 +251,8 @@ public class DocumentController {
                                 .header(HttpHeaders.CONTENT_DISPOSITION,
                                         "attachment; filename=\"" + filename + "\"")
                                 .contentType(MediaType.parseMediaType(contentType))
-                                .contentLength(resource.contentLength())
-                                .body((Resource) resource);
+                                .contentLength(decryptedData.length)
+                                .body(stream);
 
                     } catch (Exception e) {
                         log.error("Failed to download document {}: {}", id, e.getMessage(), e);
@@ -163,7 +265,7 @@ public class DocumentController {
                                 getClientIp(request),
                                 request.getHeader("User-Agent")
                         );
-                        return ResponseEntity.internalServerError().<Resource>build();
+                        return ResponseEntity.internalServerError().<StreamingResponseBody>build();
                     }
                 })
                 .orElse(ResponseEntity.notFound().build());
