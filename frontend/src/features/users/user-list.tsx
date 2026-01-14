@@ -21,7 +21,6 @@ export interface UserListItem {
 export interface UserFilters {
   search?: string;
   role?: UserRole;
-  clearanceLevel?: ClearanceLevel;
 }
 
 export interface PaginatedResponse<T> {
@@ -64,7 +63,6 @@ const clearanceColors: Record<ClearanceLevel, string> = {
   TOP_SECRET: 'bg-error-lighter text-error-dark border-error',
 };
 
-const clearanceLevels: ClearanceLevel[] = ['UNCLASSIFIED', 'CUI', 'CONFIDENTIAL', 'SECRET', 'TOP_SECRET'];
 const roles: UserRole[] = ['ADMINISTRATOR', 'OFFICER', 'AUDITOR'];
 
 function formatDate(dateString: string | undefined): string {
@@ -95,25 +93,22 @@ export function UserList({
 }: UserListProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<UserRole | ''>('');
-  const [clearanceFilter, setClearanceFilter] = useState<ClearanceLevel | ''>('');
 
   const handleFilter = (e: React.FormEvent) => {
     e.preventDefault();
     onFilter?.({
       search: searchQuery || undefined,
       role: roleFilter || undefined,
-      clearanceLevel: clearanceFilter || undefined,
     });
   };
 
   const handleClearFilters = () => {
     setSearchQuery('');
     setRoleFilter('');
-    setClearanceFilter('');
     onFilter?.({});
   };
 
-  const hasActiveFilters = searchQuery || roleFilter || clearanceFilter;
+  const hasActiveFilters = searchQuery || roleFilter;
 
   const pageNumbers = [];
   const maxVisiblePages = 5;
@@ -163,23 +158,6 @@ export function UserList({
               <option value="">All Roles</option>
               {roles.map((role) => (
                 <option key={role} value={role}>{role}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label htmlFor="clearance-filter" className="block text-sm font-medium text-neutral-700 mb-1">
-              Clearance Level
-            </label>
-            <select
-              id="clearance-filter"
-              value={clearanceFilter}
-              onChange={(e) => setClearanceFilter(e.target.value as ClearanceLevel | '')}
-              className="min-h-touch rounded border-2 border-neutral-400 bg-white px-3 py-2 text-neutral-900 focus:border-primary focus:outline-none focus:ring-focus focus:ring-primary focus:ring-offset-focus"
-            >
-              <option value="">All Clearances</option>
-              {clearanceLevels.map((level) => (
-                <option key={level} value={level}>{level.replace('_', ' ')}</option>
               ))}
             </select>
           </div>

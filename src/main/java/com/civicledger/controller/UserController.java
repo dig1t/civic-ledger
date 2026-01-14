@@ -39,7 +39,7 @@ public class UserController {
     }
 
     /**
-     * List all users with pagination, optional search, and filters.
+     * List all users with pagination, optional search, and role filter.
      * Accessible by all authenticated users.
      */
     @GetMapping
@@ -47,8 +47,7 @@ public class UserController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(required = false) String search,
-            @RequestParam(required = false) String role,
-            @RequestParam(required = false) String clearanceLevel) {
+            @RequestParam(required = false) String role) {
 
         PageRequest pageRequest = PageRequest.of(page, size, Sort.by("createdAt").descending());
 
@@ -62,48 +61,22 @@ public class UserController {
             }
         }
 
-        // Parse clearance level filter if provided
-        User.ClassificationLevel clearanceFilter = null;
-        if (clearanceLevel != null && !clearanceLevel.isBlank()) {
-            try {
-                clearanceFilter = User.ClassificationLevel.valueOf(clearanceLevel.toUpperCase());
-            } catch (IllegalArgumentException e) {
-                log.debug("Invalid clearance level filter: {}", clearanceLevel);
-            }
-        }
+        Page<User> users;
+        boolean hasSearch = search != null && !search.isBlank();
+        boolean hasRole = roleFilter != null;
 
-        Page<User> users = findUsersWithFilters(search, roleFilter, clearanceFilter, pageRequest);
+        if (hasSearch && hasRole) {
+            users = userRepository.searchUsersByRole(search, roleFilter, pageRequest);
+        } else if (hasSearch) {
+            users = userService.searchUsers(search, pageRequest);
+        } else if (hasRole) {
+            users = userRepository.findByRolePaginated(roleFilter, pageRequest);
+        } else {
+            users = userService.findAllPaginated(pageRequest);
+        }
 
         PagedResponse<UserDTO> response = PagedResponse.fromPage(users, UserDTO::fromEntity);
         return ResponseEntity.ok(response);
-    }
-
-    /**
-     * Find users with optional search and filters.
-     */
-    private Page<User> findUsersWithFilters(String search, Role role,
-            User.ClassificationLevel clearanceLevel, PageRequest pageRequest) {
-        boolean hasSearch = search != null && !search.isBlank();
-        boolean hasRole = role != null;
-        boolean hasClearance = clearanceLevel != null;
-
-        if (hasSearch && hasRole && hasClearance) {
-            return userRepository.searchUsersByRoleAndClearanceLevel(search, role, clearanceLevel, pageRequest);
-        } else if (hasSearch && hasRole) {
-            return userRepository.searchUsersByRole(search, role, pageRequest);
-        } else if (hasSearch && hasClearance) {
-            return userRepository.searchUsersByClearanceLevel(search, clearanceLevel, pageRequest);
-        } else if (hasSearch) {
-            return userService.searchUsers(search, pageRequest);
-        } else if (hasRole && hasClearance) {
-            return userRepository.findByRoleAndClearanceLevel(role, clearanceLevel, pageRequest);
-        } else if (hasRole) {
-            return userRepository.findByRolePaginated(role, pageRequest);
-        } else if (hasClearance) {
-            return userRepository.findByClearanceLevel(clearanceLevel, pageRequest);
-        } else {
-            return userService.findAllPaginated(pageRequest);
-        }
     }
 
     /**

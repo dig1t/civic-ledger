@@ -81,20 +81,6 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     Page<User> findByRolePaginated(@Param("role") Role role, Pageable pageable);
 
     /**
-     * Filter users by clearance level with pagination.
-     */
-    Page<User> findByClearanceLevel(User.ClassificationLevel clearanceLevel, Pageable pageable);
-
-    /**
-     * Filter users by role and clearance level with pagination.
-     */
-    @Query("SELECT u FROM User u JOIN u.roles r WHERE r = :role AND u.clearanceLevel = :clearanceLevel")
-    Page<User> findByRoleAndClearanceLevel(
-            @Param("role") Role role,
-            @Param("clearanceLevel") User.ClassificationLevel clearanceLevel,
-            Pageable pageable);
-
-    /**
      * Search users with role filter.
      */
     @Query("SELECT u FROM User u JOIN u.roles r WHERE r = :role AND " +
@@ -102,29 +88,4 @@ public interface UserRepository extends JpaRepository<User, UUID> {
            "OR LOWER(u.lastName) LIKE LOWER(CONCAT('%', :search, '%')) " +
            "OR LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%')))")
     Page<User> searchUsersByRole(@Param("search") String search, @Param("role") Role role, Pageable pageable);
-
-    /**
-     * Search users with clearance level filter.
-     */
-    @Query("SELECT u FROM User u WHERE u.clearanceLevel = :clearanceLevel AND " +
-           "(LOWER(u.firstName) LIKE LOWER(CONCAT('%', :search, '%')) " +
-           "OR LOWER(u.lastName) LIKE LOWER(CONCAT('%', :search, '%')) " +
-           "OR LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%')))")
-    Page<User> searchUsersByClearanceLevel(
-            @Param("search") String search,
-            @Param("clearanceLevel") User.ClassificationLevel clearanceLevel,
-            Pageable pageable);
-
-    /**
-     * Search users with role and clearance level filters.
-     */
-    @Query("SELECT u FROM User u JOIN u.roles r WHERE r = :role AND u.clearanceLevel = :clearanceLevel AND " +
-           "(LOWER(u.firstName) LIKE LOWER(CONCAT('%', :search, '%')) " +
-           "OR LOWER(u.lastName) LIKE LOWER(CONCAT('%', :search, '%')) " +
-           "OR LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%')))")
-    Page<User> searchUsersByRoleAndClearanceLevel(
-            @Param("search") String search,
-            @Param("role") Role role,
-            @Param("clearanceLevel") User.ClassificationLevel clearanceLevel,
-            Pageable pageable);
 }
