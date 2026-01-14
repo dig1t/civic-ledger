@@ -12,6 +12,7 @@ import com.civicledger.service.EncryptionService;
 import com.civicledger.service.EncryptionService.EncryptionResult;
 import com.civicledger.service.HashingService;
 import com.civicledger.service.StorageService;
+import com.civicledger.service.AISummaryService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -41,6 +42,7 @@ public class DocumentController {
     private final HashingService hashingService;
     private final StorageService storageService;
     private final ClearanceValidator clearanceValidator;
+    private final AISummaryService aiSummaryService;
 
     public DocumentController(
             DocumentRepository documentRepository,
@@ -48,13 +50,15 @@ public class DocumentController {
             EncryptionService encryptionService,
             HashingService hashingService,
             StorageService storageService,
-            ClearanceValidator clearanceValidator) {
+            ClearanceValidator clearanceValidator,
+            AISummaryService aiSummaryService) {
         this.documentRepository = documentRepository;
         this.auditService = auditService;
         this.encryptionService = encryptionService;
         this.hashingService = hashingService;
         this.storageService = storageService;
         this.clearanceValidator = clearanceValidator;
+        this.aiSummaryService = aiSummaryService;
     }
 
     @GetMapping
@@ -376,6 +380,60 @@ public class DocumentController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    /**
+     * Generate AI summary for a document.
+     * Only works for text-based documents.
+     */
+    @PostMapping("/{id}/summary")
+    public ResponseEntity<?> generateSummary(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal User user,
+            HttpServletRequest request) {
+
+        if (!aiSummaryService.isAvailable()) {
+            return ResponseEntity.status(503)
+                    .body(new ErrorResponse("AI summary service is not available"));
+        }
+
+        return documentRepository.findByIdAndDeletedFalse(id)
+                .map(doc -> {
+                    // Validate clearance
+                    if (!clearanceValidator.hasAccess(user, doc)) {
+                        return ResponseEntity.status(403)
+                                .body(new ErrorResponse("Access denied"));
+                    }
+
+                    if (!aiSummaryService.isSummarizable(doc.getContentType())) {
+                        return ResponseEntity.badRequest()
+                                .body(new ErrorResponse("Document type not supported for AI summary"));
+                    }
+
+                    var summary = aiSummaryService.generateSummary(id);
+
+                    if (summary.isPresent()) {
+                        auditService.log(
+                                ActionType.DOCUMENT_VIEW,
+                                "DOCUMENT",
+                                id.toString(),
+                                AuditStatus.SUCCESS,
+                                "Generated AI summary for: " + doc.getOriginalFilename(),
+                                getClientIp(request),
+                                request.getHeader("User-Agent")
+                        );
+
+                        // Refresh document from DB to get updated summary
+                        Document updated = documentRepository.findById(id).orElse(doc);
+                        return ResponseEntity.ok(toDTO(updated));
+                    } else {
+                        return ResponseEntity.status(500)
+                                .body(new ErrorResponse("Failed to generate summary"));
+                    }
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    record ErrorResponse(String message) {}
+
     private DocumentDTO toDTO(Document doc) {
         return new DocumentDTO(
                 doc.getId().toString(),
@@ -385,7 +443,10 @@ public class DocumentController {
                 doc.getVersionNumber(),
                 doc.getUploadedBy(),
                 doc.getCreatedAt().toString(),
-                doc.getOriginalSize()
+                doc.getOriginalSize(),
+                doc.getAiSummary(),
+                doc.getSummaryGeneratedAt() != null ? doc.getSummaryGeneratedAt().toString() : null,
+                aiSummaryService.isSummarizable(doc.getContentType())
         );
     }
 
@@ -397,7 +458,10 @@ public class DocumentController {
             Integer versionNumber,
             String uploadedBy,
             String uploadedAt,
-            Long fileSize
+            Long fileSize,
+            String aiSummary,
+            String summaryGeneratedAt,
+            boolean canGenerateSummary
     ) {}
 
     private String getClientIp(HttpServletRequest request) {
