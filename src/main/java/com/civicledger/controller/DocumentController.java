@@ -1,5 +1,6 @@
 package com.civicledger.controller;
 
+import com.civicledger.dto.PagedResponse;
 import com.civicledger.entity.AuditLog.ActionType;
 import com.civicledger.entity.AuditLog.AuditStatus;
 import com.civicledger.entity.Document;
@@ -58,7 +59,7 @@ public class DocumentController {
     }
 
     @GetMapping
-    public ResponseEntity<List<DocumentDTO>> listDocuments(
+    public ResponseEntity<PagedResponse<DocumentDTO>> listDocuments(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) String search,
@@ -76,8 +77,8 @@ public class DocumentController {
             documents = documentRepository.findByClassificationLevelAtOrBelow(maxLevel, pageRequest);
         }
 
-        List<DocumentDTO> dtos = documents.map(this::toDTO).getContent();
-        return ResponseEntity.ok(dtos);
+        PagedResponse<DocumentDTO> response = PagedResponse.fromPage(documents, this::toDTO);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/{id}")

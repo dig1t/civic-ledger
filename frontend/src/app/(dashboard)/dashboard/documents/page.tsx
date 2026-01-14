@@ -1,36 +1,58 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRequireAuth } from '@/util/auth';
 import { api } from '@/util/api';
 import { DocumentList, type Document } from '@/features/documents';
+import type { PaginatedResponse } from '@/types/api';
+
+const PAGE_SIZE = 20;
 
 export default function DocumentsPage() {
   // Role check - redirects to /unauthorized if not OFFICER or ADMINISTRATOR
   const { isAuthorized } = useRequireAuth('OFFICER', 'ADMINISTRATOR');
   const [documents, setDocuments] = useState<Document[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalElements, setTotalElements] = useState(0);
+  const [searchQuery, setSearchQuery] = useState('');
 
-  useEffect(() => {
-    if (isAuthorized) {
-      loadDocuments();
-    }
-  }, [isAuthorized]);
-
-  async function loadDocuments(query?: string) {
+  const loadDocuments = useCallback(async (page: number, query?: string) => {
     setIsLoading(true);
     try {
-      const endpoint = query
-        ? `/documents?search=${encodeURIComponent(query)}`
-        : '/documents';
-      const data = await api.get<Document[]>(endpoint);
-      setDocuments(data);
+      let endpoint = `/documents?page=${page}&size=${PAGE_SIZE}`;
+      if (query) {
+        endpoint += `&search=${encodeURIComponent(query)}`;
+      }
+      const response = await api.get<PaginatedResponse<Document>>(endpoint);
+      setDocuments(response.content);
+      setCurrentPage(response.page);
+      setTotalPages(response.totalPages);
+      setTotalElements(response.totalElements);
     } catch {
       setDocuments([]);
+      setTotalPages(0);
+      setTotalElements(0);
     } finally {
       setIsLoading(false);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    if (isAuthorized) {
+      loadDocuments(0);
+    }
+  }, [isAuthorized, loadDocuments]);
+
+  const handlePageChange = (page: number) => {
+    loadDocuments(page, searchQuery);
+  };
+
+  const handleSearch = (query: string) => {
+    setSearchQuery(query);
+    loadDocuments(0, query);
+  };
 
   async function handleDownload(doc: Document) {
     try {
@@ -76,7 +98,12 @@ export default function DocumentsPage() {
       <DocumentList
         documents={documents}
         isLoading={isLoading}
-        onSearch={loadDocuments}
+        currentPage={currentPage}
+        totalPages={totalPages}
+        totalElements={totalElements}
+        pageSize={PAGE_SIZE}
+        onPageChange={handlePageChange}
+        onSearch={handleSearch}
         onDownload={handleDownload}
       />
     </div>
