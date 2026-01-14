@@ -73,6 +73,11 @@ public class SecurityConfig {
                 .requestMatchers("/api/admin/**").hasRole("ADMINISTRATOR")
                 .requestMatchers("/api/documents/**").hasAnyRole("OFFICER", "ADMINISTRATOR")
                 .requestMatchers("/api/audit-logs/**", "/api/audit/**").hasAnyRole("AUDITOR", "ADMINISTRATOR")
+                // User management - read access for all authenticated, write access for admin only
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/users", "/api/users/**").authenticated()
+                .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/users").hasRole("ADMINISTRATOR")
+                .requestMatchers(org.springframework.http.HttpMethod.PUT, "/api/users/**").hasRole("ADMINISTRATOR")
+                .requestMatchers(org.springframework.http.HttpMethod.DELETE, "/api/users/**").hasRole("ADMINISTRATOR")
                 .anyRequest().authenticated());
 
         // Configure authentication based on mode
