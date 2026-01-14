@@ -9,7 +9,15 @@ import {
   type AuditLogFilters,
 } from '@/features/audit';
 
-// Backend returns a plain array of audit logs
+interface PaginatedResponse<T> {
+  content: T[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  first: boolean;
+  last: boolean;
+}
 
 export default function AuditLogsPage() {
   // Role check - redirects to /unauthorized if not AUDITOR or ADMINISTRATOR
@@ -17,17 +25,16 @@ export default function AuditLogsPage() {
   const [logs, setLogs] = useState<AuditLogEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [hasMore, setHasMore] = useState(false);
-  const [cursor, setCursor] = useState<string | undefined>();
+  const [currentPage, setCurrentPage] = useState(0);
   const [filters, setFilters] = useState<AuditLogFilters>({});
 
   const loadLogs = useCallback(
-    async (append: boolean, currentCursor?: string) => {
+    async (append: boolean, page: number = 0) => {
       setIsLoading(true);
       try {
         const params = new URLSearchParams();
-        if (append && currentCursor) {
-          params.set('cursor', currentCursor);
-        }
+        params.set('page', page.toString());
+        params.set('size', '50');
         if (filters.actionType) {
           params.set('actionType', filters.actionType);
         }
@@ -42,17 +49,16 @@ export default function AuditLogsPage() {
         }
 
         const queryString = params.toString();
-        const endpoint = `/audit-logs${queryString ? `?${queryString}` : ''}`;
-        const data = await api.get<AuditLogEntry[]>(endpoint);
+        const endpoint = `/audit-logs?${queryString}`;
+        const data = await api.get<PaginatedResponse<AuditLogEntry>>(endpoint);
 
         if (append) {
-          setLogs((prev) => [...prev, ...data]);
+          setLogs((prev) => [...prev, ...(data.content || [])]);
         } else {
-          setLogs(data);
+          setLogs(data.content || []);
         }
-        // Backend doesn't support pagination yet
-        setHasMore(false);
-        setCursor(undefined);
+        setCurrentPage(data.page);
+        setHasMore(!data.last);
       } catch {
         if (!append) {
           setLogs([]);
@@ -72,12 +78,12 @@ export default function AuditLogsPage() {
   }, [isAuthorized, loadLogs]);
 
   const handleFilter = (newFilters: AuditLogFilters) => {
-    setCursor(undefined);
+    setCurrentPage(0);
     setFilters(newFilters);
   };
 
   const handleLoadMore = () => {
-    loadLogs(true, cursor);
+    loadLogs(true, currentPage + 1);
   };
 
   // Role check in progress or unauthorized - useRequireAuth handles redirect
