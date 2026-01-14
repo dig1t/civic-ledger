@@ -52,9 +52,6 @@ export default function UsersPage() {
       if (filters.role) {
         params.set('role', filters.role);
       }
-      if (filters.clearanceLevel) {
-        params.set('clearanceLevel', filters.clearanceLevel);
-      }
       const response = await api.get<PaginatedResponse<UserListItem>>(`/users?${params.toString()}`);
       setUsers(response.content);
       setCurrentPage(response.page);
