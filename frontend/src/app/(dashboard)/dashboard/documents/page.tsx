@@ -1,9 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { useRequireAuth } from '@/util/auth';
+import { useAuth, useRequireAuth } from '@/util/auth';
 import { api } from '@/util/api';
-import { DocumentList, type Document } from '@/features/documents';
+import { Button, useToast } from '@/components';
+import { DocumentList, FileUpload, type Document } from '@/features/documents';
 import type { PaginatedResponse } from '@/types/api';
 
 const PAGE_SIZE = 20;
@@ -11,6 +12,8 @@ const PAGE_SIZE = 20;
 export default function DocumentsPage() {
   // Role check - redirects to /unauthorized if not OFFICER or ADMINISTRATOR
   const { isAuthorized } = useRequireAuth('OFFICER', 'ADMINISTRATOR');
+  const { hasRole } = useAuth();
+  const { showToast } = useToast();
   const [documents, setDocuments] = useState<Document[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -18,6 +21,9 @@ export default function DocumentsPage() {
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+
+  const canUpload = hasRole('OFFICER', 'ADMINISTRATOR');
 
   const loadDocuments = useCallback(async (page: number, query?: string) => {
     setIsLoading(true);
@@ -84,6 +90,31 @@ export default function DocumentsPage() {
     }
   }
 
+  async function handleUpload(file: File) {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/documents/upload`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: formData,
+      }
+    );
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.message || 'Upload failed');
+    }
+
+    showToast('Document uploaded successfully', 'success');
+    setIsUploadModalOpen(false);
+    loadDocuments(0, searchQuery);
+  }
+
   // Role check in progress or unauthorized - useRequireAuth handles redirect
   if (!isAuthorized) {
     return null;
@@ -91,11 +122,18 @@ export default function DocumentsPage() {
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-bold text-neutral-900">Documents</h1>
-        <p className="mt-1 text-neutral-600">
-          Search and download documents from the secure repository.
-        </p>
+      <header className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-neutral-900">Documents</h1>
+          <p className="mt-1 text-neutral-600">
+            Search and download documents from the secure repository.
+          </p>
+        </div>
+        {canUpload && (
+          <Button onClick={() => setIsUploadModalOpen(true)}>
+            Upload Document
+          </Button>
+        )}
       </header>
 
       {error && (
@@ -115,6 +153,33 @@ export default function DocumentsPage() {
         onSearch={handleSearch}
         onDownload={handleDownload}
       />
+
+      {/* Upload Modal */}
+      {isUploadModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="upload-dialog-title"
+        >
+          <div className="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 id="upload-dialog-title" className="text-lg font-semibold text-neutral-900">
+                Upload Document
+              </h2>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsUploadModalOpen(false)}
+                aria-label="Close upload dialog"
+              >
+                Close
+              </Button>
+            </div>
+            <FileUpload onUpload={handleUpload} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
