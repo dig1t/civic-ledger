@@ -5,8 +5,6 @@ import { cn } from '@/util/utils';
 import { Button, Input } from '@/components';
 import type { UserRole } from '@/util/auth';
 
-export type ClearanceLevel = 'UNCLASSIFIED' | 'CUI' | 'CONFIDENTIAL' | 'SECRET' | 'TOP_SECRET';
-
 export interface UserListItem {
   id: string;
   email: string;
@@ -15,7 +13,6 @@ export interface UserListItem {
   enabled: boolean;
   createdAt: string;
   lastLoginAt?: string;
-  clearanceLevel?: ClearanceLevel;
 }
 
 export interface UserFilters {
@@ -53,14 +50,6 @@ const roleColors: Record<UserRole, string> = {
   ADMINISTRATOR: 'bg-error-lighter text-error-dark border-error',
   OFFICER: 'bg-info-lighter text-info-dark border-info',
   AUDITOR: 'bg-warning-lighter text-warning-dark border-warning',
-};
-
-const clearanceColors: Record<ClearanceLevel, string> = {
-  UNCLASSIFIED: 'bg-success-lighter text-success-dark border-success',
-  CUI: 'bg-info-lighter text-info-dark border-info',
-  CONFIDENTIAL: 'bg-primary-lighter text-primary-dark border-primary',
-  SECRET: 'bg-warning-lighter text-warning-dark border-warning',
-  TOP_SECRET: 'bg-error-lighter text-error-dark border-error',
 };
 
 const roles: UserRole[] = ['ADMINISTRATOR', 'OFFICER', 'AUDITOR'];
@@ -194,9 +183,6 @@ export function UserList({
                 Role
               </th>
               <th scope="col" className="px-4 py-3 text-sm font-semibold text-neutral-900">
-                Clearance
-              </th>
-              <th scope="col" className="px-4 py-3 text-sm font-semibold text-neutral-900">
                 Status
               </th>
               <th scope="col" className="px-4 py-3 text-sm font-semibold text-neutral-900">
@@ -213,7 +199,7 @@ export function UserList({
           <tbody className="divide-y divide-neutral-200">
             {isLoading ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center">
+                <td colSpan={6} className="px-4 py-8 text-center">
                   <div className="flex items-center justify-center gap-2">
                     <svg
                       className="h-5 w-5 animate-spin text-primary"
@@ -242,7 +228,7 @@ export function UserList({
               </tr>
             ) : users.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-neutral-500">
+                <td colSpan={6} className="px-4 py-8 text-center text-neutral-500">
                   No users found
                 </td>
               </tr>
@@ -269,18 +255,6 @@ export function UserList({
                         </span>
                       ))}
                     </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    {user.clearanceLevel && (
-                      <span
-                        className={cn(
-                          'inline-block rounded border px-2 py-1 text-xs font-medium',
-                          clearanceColors[user.clearanceLevel]
-                        )}
-                      >
-                        {user.clearanceLevel.replace('_', ' ')}
-                      </span>
-                    )}
                   </td>
                   <td className="px-4 py-3">
                     <span
