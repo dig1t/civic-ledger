@@ -17,11 +17,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
-import org.springframework.core.io.ByteArrayResource;
-import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -131,7 +130,7 @@ public class DocumentController {
     }
 
     @GetMapping("/{id}/download")
-    public ResponseEntity<Resource> downloadDocument(
+    public ResponseEntity<StreamingResponseBody> downloadDocument(
             @PathVariable UUID id,
             @AuthenticationPrincipal User user,
             HttpServletRequest request) {
@@ -166,7 +165,7 @@ public class DocumentController {
                                     getClientIp(request),
                                     request.getHeader("User-Agent")
                             );
-                            return ResponseEntity.notFound().build();
+                            return ResponseEntity.notFound().<StreamingResponseBody>build();
                         }
 
                         // Step 2: Retrieve encrypted data from storage
@@ -193,24 +192,57 @@ public class DocumentController {
                                     getClientIp(request),
                                     request.getHeader("User-Agent")
                             );
-                            return ResponseEntity.status(500)
-                                    .<Resource>body(null);
+                            return ResponseEntity.status(500).<StreamingResponseBody>body(null);
                         }
 
-                        // Log successful download
+                        // Capture values for use in lambda
+                        String clientIp = getClientIp(request);
+                        String userAgent = request.getHeader("User-Agent");
+                        String filename = doc.getOriginalFilename();
+
+                        // Log download started
                         auditService.log(
-                                ActionType.DOCUMENT_DOWNLOAD,
+                                ActionType.DOCUMENT_DOWNLOAD_STARTED,
                                 "DOCUMENT",
                                 id.toString(),
                                 AuditStatus.SUCCESS,
-                                "Downloaded document: " + doc.getOriginalFilename() + " (hash verified)",
-                                getClientIp(request),
-                                request.getHeader("User-Agent")
+                                "Download started: " + filename + " (" + decryptedData.length + " bytes)",
+                                clientIp,
+                                userAgent
                         );
 
-                        ByteArrayResource resource = new ByteArrayResource(decryptedData);
+                        // Create streaming response to track transfer completion
+                        StreamingResponseBody stream = outputStream -> {
+                            try {
+                                outputStream.write(decryptedData);
+                                outputStream.flush();
+                                // Log completed AFTER all bytes written to client
+                                auditService.log(
+                                        ActionType.DOCUMENT_DOWNLOAD_COMPLETED,
+                                        "DOCUMENT",
+                                        id.toString(),
+                                        AuditStatus.SUCCESS,
+                                        "Download completed: " + filename + " (hash verified)",
+                                        clientIp,
+                                        userAgent
+                                );
+                                log.debug("Download completed for document {}", id);
+                            } catch (IOException e) {
+                                // Connection dropped mid-transfer
+                                log.warn("Download interrupted for document {}: {}", id, e.getMessage());
+                                auditService.log(
+                                        ActionType.DOCUMENT_DOWNLOAD,
+                                        "DOCUMENT",
+                                        id.toString(),
+                                        AuditStatus.FAILURE,
+                                        "Download interrupted: " + filename + " - " + e.getMessage(),
+                                        clientIp,
+                                        userAgent
+                                );
+                                throw e;
+                            }
+                        };
 
-                        String filename = doc.getOriginalFilename();
                         String contentType = doc.getContentType() != null
                                 ? doc.getContentType()
                                 : MediaType.APPLICATION_OCTET_STREAM_VALUE;
@@ -219,8 +251,8 @@ public class DocumentController {
                                 .header(HttpHeaders.CONTENT_DISPOSITION,
                                         "attachment; filename=\"" + filename + "\"")
                                 .contentType(MediaType.parseMediaType(contentType))
-                                .contentLength(resource.contentLength())
-                                .body((Resource) resource);
+                                .contentLength(decryptedData.length)
+                                .body(stream);
 
                     } catch (Exception e) {
                         log.error("Failed to download document {}: {}", id, e.getMessage(), e);
@@ -233,7 +265,7 @@ public class DocumentController {
                                 getClientIp(request),
                                 request.getHeader("User-Agent")
                         );
-                        return ResponseEntity.internalServerError().<Resource>build();
+                        return ResponseEntity.internalServerError().<StreamingResponseBody>build();
                     }
                 })
                 .orElse(ResponseEntity.notFound().build());
