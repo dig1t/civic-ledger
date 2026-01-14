@@ -91,9 +91,12 @@ public class AuditLog {
         // Document operations
         DOCUMENT_UPLOAD,
         DOCUMENT_DOWNLOAD,
+        DOCUMENT_DOWNLOAD_STARTED,
+        DOCUMENT_DOWNLOAD_COMPLETED,
         DOCUMENT_VIEW,
         DOCUMENT_DELETE,
         DOCUMENT_UPDATE,
+        DOCUMENT_ACCESS_DENIED,
 
         // Administrative actions
         USER_CREATE,

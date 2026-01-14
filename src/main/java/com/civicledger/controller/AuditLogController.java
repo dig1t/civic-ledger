@@ -1,5 +1,6 @@
 package com.civicledger.controller;
 
+import com.civicledger.dto.PagedResponse;
 import com.civicledger.entity.AuditLog;
 import com.civicledger.repository.AuditLogRepository;
 import jakarta.persistence.criteria.Predicate;
@@ -27,7 +28,7 @@ public class AuditLogController {
     }
 
     @GetMapping
-    public ResponseEntity<List<AuditLogDTO>> listAuditLogs(
+    public ResponseEntity<PagedResponse<AuditLogDTO>> listAuditLogs(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size,
             @RequestParam(required = false) String actionType,
@@ -41,8 +42,8 @@ public class AuditLogController {
         Specification<AuditLog> spec = buildSpecification(actionType, userId, startDate, endDate);
 
         Page<AuditLog> logs = auditLogRepository.findAll(spec, pageRequest);
-        List<AuditLogDTO> dtos = logs.map(this::toDTO).getContent();
-        return ResponseEntity.ok(dtos);
+        PagedResponse<AuditLogDTO> response = PagedResponse.fromPage(logs, this::toDTO);
+        return ResponseEntity.ok(response);
     }
 
     private Specification<AuditLog> buildSpecification(String actionType, String userId,

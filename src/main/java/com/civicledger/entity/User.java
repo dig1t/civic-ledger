@@ -82,10 +82,12 @@ public class User {
 
     /**
      * Security clearance level (for document access control).
+     * Defaults to UNCLASSIFIED for new users.
      */
     @Enumerated(EnumType.STRING)
-    @Column
-    private ClassificationLevel clearanceLevel;
+    @Column(nullable = false)
+    @Builder.Default
+    private ClassificationLevel clearanceLevel = ClassificationLevel.UNCLASSIFIED;
 
     @PrePersist
     protected void onCreate() {

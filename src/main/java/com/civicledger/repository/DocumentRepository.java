@@ -42,11 +42,11 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
             ClassificationLevel level, Pageable pageable);
 
     /**
-     * Find documents with classification at or below a given level.
+     * Find documents with classification in the allowed levels.
      */
-    @Query("SELECT d FROM Document d WHERE d.deleted = false AND d.classificationLevel <= :maxLevel ORDER BY d.createdAt DESC")
-    Page<Document> findByClassificationLevelAtOrBelow(
-            @Param("maxLevel") ClassificationLevel maxLevel, Pageable pageable);
+    @Query("SELECT d FROM Document d WHERE d.deleted = false AND d.classificationLevel IN :allowedLevels")
+    Page<Document> findByClassificationLevelIn(
+            @Param("allowedLevels") List<ClassificationLevel> allowedLevels, Pageable pageable);
 
     /**
      * Find document by file hash (for deduplication).
@@ -75,6 +75,15 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
      */
     @Query("SELECT d FROM Document d WHERE d.deleted = false AND LOWER(d.originalFilename) LIKE LOWER(CONCAT('%', :query, '%'))")
     Page<Document> searchByFilename(@Param("query") String query, Pageable pageable);
+
+    /**
+     * Search documents by filename with clearance filtering.
+     */
+    @Query("SELECT d FROM Document d WHERE d.deleted = false AND d.classificationLevel IN :allowedLevels AND LOWER(d.originalFilename) LIKE LOWER(CONCAT('%', :query, '%'))")
+    Page<Document> searchByFilenameWithClearance(
+            @Param("query") String query,
+            @Param("allowedLevels") List<ClassificationLevel> allowedLevels,
+            Pageable pageable);
 
     /**
      * Find documents created within a date range.
