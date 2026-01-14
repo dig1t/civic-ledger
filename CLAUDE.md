@@ -71,6 +71,13 @@ npm run lint
 
 See DEVELOPMENT_PLAN.md and DEV_CHECKLIST.md for implementation details.
 
+## Task Management
+
+**Always create TODO.md files for tasks inside the `docs/` directory.** When working on features or fixes:
+- Create a TODO.md file in `docs/` to track task progress
+- Break down complex tasks into actionable items
+- Mark items as completed as you finish them
+
 ## Documentation
 
 **Always keep documentation up to date.** When making changes to the codebase:
