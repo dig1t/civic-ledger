@@ -79,6 +79,13 @@
 			<version>2.5.0</version>
 		</dependency>
 
+		<!-- Dotenv support for .env files -->
+		<dependency>
+			<groupId>me.paulschwarz</groupId>
+			<artifactId>spring-dotenv</artifactId>
+			<version>4.0.0</version>
+		</dependency>
+
 		<!-- JWT Support for mock authentication -->
 		<dependency>
 			<groupId>io.jsonwebtoken</groupId>

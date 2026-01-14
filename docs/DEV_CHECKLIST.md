@@ -52,8 +52,8 @@
     - [ ] Real-time audit log display
     - [ ] Log filtering and search
 
-## 🤖 Phase 4: AI & Automation (Bonus - Job Specific)
-- [ ] **AI Summary Agent**
-    - [ ] Simple integration (OpenAI/Local LLM) to generate 1-sentence summaries of uploaded text documents.
-    - [ ] **Why:** Matches the "AI-assisted" requirement in the job description.
+## 🤖 Phase 4: AI & Automation (Bonus - Job Specific) ✅
+- [x] **AI Summary Agent**
+    - [x] Simple integration (OpenAI/Local LLM) to generate 1-sentence summaries of uploaded text documents.
+    - [x] **Why:** Matches the "AI-assisted" requirement in the job description.
 

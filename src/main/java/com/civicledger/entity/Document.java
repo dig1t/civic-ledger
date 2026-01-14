@@ -116,6 +116,18 @@ public class Document {
     private String description;
 
     /**
+     * AI-generated summary of the document content.
+     */
+    @Column(length = 500)
+    private String aiSummary;
+
+    /**
+     * Timestamp when AI summary was generated.
+     */
+    @Column
+    private Instant summaryGeneratedAt;
+
+    /**
      * Optional tags for categorization (comma-separated).
      */
     @Column(length = 500)
