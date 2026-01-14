@@ -5,6 +5,8 @@ import { cn } from '@/util/utils';
 import { Button, Input } from '@/components';
 import type { UserRole } from '@/util/auth';
 
+export type ClearanceLevel = 'UNCLASSIFIED' | 'CUI' | 'CONFIDENTIAL' | 'SECRET' | 'TOP_SECRET';
+
 export interface UserListItem {
   id: string;
   email: string;
@@ -13,6 +15,13 @@ export interface UserListItem {
   enabled: boolean;
   createdAt: string;
   lastLoginAt?: string;
+  clearanceLevel?: ClearanceLevel;
+}
+
+export interface UserFilters {
+  search?: string;
+  role?: UserRole;
+  clearanceLevel?: ClearanceLevel;
 }
 
 export interface PaginatedResponse<T> {
@@ -32,7 +41,7 @@ interface UserListProps {
   totalPages: number;
   totalElements: number;
   onPageChange: (page: number) => void;
-  onSearch?: (query: string) => void;
+  onFilter?: (filters: UserFilters) => void;
   onEdit?: (user: UserListItem) => void;
   onDelete?: (user: UserListItem) => void;
   onToggleEnabled?: (user: UserListItem) => void;
@@ -46,6 +55,17 @@ const roleColors: Record<UserRole, string> = {
   OFFICER: 'bg-info-lighter text-info-dark border-info',
   AUDITOR: 'bg-warning-lighter text-warning-dark border-warning',
 };
+
+const clearanceColors: Record<ClearanceLevel, string> = {
+  UNCLASSIFIED: 'bg-success-lighter text-success-dark border-success',
+  CUI: 'bg-info-lighter text-info-dark border-info',
+  CONFIDENTIAL: 'bg-primary-lighter text-primary-dark border-primary',
+  SECRET: 'bg-warning-lighter text-warning-dark border-warning',
+  TOP_SECRET: 'bg-error-lighter text-error-dark border-error',
+};
+
+const clearanceLevels: ClearanceLevel[] = ['UNCLASSIFIED', 'CUI', 'CONFIDENTIAL', 'SECRET', 'TOP_SECRET'];
+const roles: UserRole[] = ['ADMINISTRATOR', 'OFFICER', 'AUDITOR'];
 
 function formatDate(dateString: string | undefined): string {
   if (!dateString) return 'Never';
@@ -65,7 +85,7 @@ export function UserList({
   totalPages,
   totalElements,
   onPageChange,
-  onSearch,
+  onFilter,
   onEdit,
   onDelete,
   onToggleEnabled,
@@ -74,11 +94,26 @@ export function UserList({
   canViewAuditLogs,
 }: UserListProps) {
   const [searchQuery, setSearchQuery] = useState('');
+  const [roleFilter, setRoleFilter] = useState<UserRole | ''>('');
+  const [clearanceFilter, setClearanceFilter] = useState<ClearanceLevel | ''>('');
 
-  const handleSearch = (e: React.FormEvent) => {
+  const handleFilter = (e: React.FormEvent) => {
     e.preventDefault();
-    onSearch?.(searchQuery);
+    onFilter?.({
+      search: searchQuery || undefined,
+      role: roleFilter || undefined,
+      clearanceLevel: clearanceFilter || undefined,
+    });
   };
+
+  const handleClearFilters = () => {
+    setSearchQuery('');
+    setRoleFilter('');
+    setClearanceFilter('');
+    onFilter?.({});
+  };
+
+  const hasActiveFilters = searchQuery || roleFilter || clearanceFilter;
 
   const pageNumbers = [];
   const maxVisiblePages = 5;
@@ -95,22 +130,70 @@ export function UserList({
 
   return (
     <div className="space-y-4">
-      {/* Search form */}
-      <form onSubmit={handleSearch} className="flex gap-2" role="search">
-        <label htmlFor="user-search" className="sr-only">
-          Search users
-        </label>
-        <Input
-          id="user-search"
-          type="search"
-          placeholder="Search by name or email..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="flex-1"
-        />
-        <Button type="submit" variant="secondary">
-          Search
-        </Button>
+      {/* Search and filter form */}
+      <form onSubmit={handleFilter} className="space-y-3" role="search">
+        <div className="flex gap-2">
+          <label htmlFor="user-search" className="sr-only">
+            Search users
+          </label>
+          <Input
+            id="user-search"
+            type="search"
+            placeholder="Search by name or email..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="flex-1"
+          />
+          <Button type="submit" variant="secondary">
+            Search
+          </Button>
+        </div>
+
+        <div className="flex flex-wrap gap-3 items-end">
+          <div>
+            <label htmlFor="role-filter" className="block text-sm font-medium text-neutral-700 mb-1">
+              Role
+            </label>
+            <select
+              id="role-filter"
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value as UserRole | '')}
+              className="min-h-touch rounded border-2 border-neutral-400 bg-white px-3 py-2 text-neutral-900 focus:border-primary focus:outline-none focus:ring-focus focus:ring-primary focus:ring-offset-focus"
+            >
+              <option value="">All Roles</option>
+              {roles.map((role) => (
+                <option key={role} value={role}>{role}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="clearance-filter" className="block text-sm font-medium text-neutral-700 mb-1">
+              Clearance Level
+            </label>
+            <select
+              id="clearance-filter"
+              value={clearanceFilter}
+              onChange={(e) => setClearanceFilter(e.target.value as ClearanceLevel | '')}
+              className="min-h-touch rounded border-2 border-neutral-400 bg-white px-3 py-2 text-neutral-900 focus:border-primary focus:outline-none focus:ring-focus focus:ring-primary focus:ring-offset-focus"
+            >
+              <option value="">All Clearances</option>
+              {clearanceLevels.map((level) => (
+                <option key={level} value={level}>{level.replace('_', ' ')}</option>
+              ))}
+            </select>
+          </div>
+
+          <Button type="submit" variant="primary">
+            Apply Filters
+          </Button>
+
+          {hasActiveFilters && (
+            <Button type="button" variant="ghost" onClick={handleClearFilters}>
+              Clear Filters
+            </Button>
+          )}
+        </div>
       </form>
 
       {/* Results count for screen readers */}
@@ -133,6 +216,9 @@ export function UserList({
                 Role
               </th>
               <th scope="col" className="px-4 py-3 text-sm font-semibold text-neutral-900">
+                Clearance
+              </th>
+              <th scope="col" className="px-4 py-3 text-sm font-semibold text-neutral-900">
                 Status
               </th>
               <th scope="col" className="px-4 py-3 text-sm font-semibold text-neutral-900">
@@ -149,7 +235,7 @@ export function UserList({
           <tbody className="divide-y divide-neutral-200">
             {isLoading ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center">
+                <td colSpan={7} className="px-4 py-8 text-center">
                   <div className="flex items-center justify-center gap-2">
                     <svg
                       className="h-5 w-5 animate-spin text-primary"
@@ -178,7 +264,7 @@ export function UserList({
               </tr>
             ) : users.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-neutral-500">
+                <td colSpan={7} className="px-4 py-8 text-center text-neutral-500">
                   No users found
                 </td>
               </tr>
@@ -205,6 +291,18 @@ export function UserList({
                         </span>
                       ))}
                     </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    {user.clearanceLevel && (
+                      <span
+                        className={cn(
+                          'inline-block rounded border px-2 py-1 text-xs font-medium',
+                          clearanceColors[user.clearanceLevel]
+                        )}
+                      >
+                        {user.clearanceLevel.replace('_', ' ')}
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <span

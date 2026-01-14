@@ -11,6 +11,7 @@ import {
   type UserListItem,
   type PaginatedResponse,
   type UserFormData,
+  type UserFilters,
 } from '@/features/users';
 
 export default function UsersPage() {
@@ -24,7 +25,7 @@ export default function UsersPage() {
   const [currentPage, setCurrentPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [currentFilters, setCurrentFilters] = useState<UserFilters>({});
 
   // Modal states
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
@@ -39,14 +40,22 @@ export default function UsersPage() {
   const canManageUsers = hasRole('ADMINISTRATOR');
   const canViewAuditLogs = hasRole('ADMINISTRATOR', 'AUDITOR');
 
-  const fetchUsers = useCallback(async (page: number, search?: string) => {
+  const fetchUsers = useCallback(async (page: number, filters: UserFilters = {}) => {
     setIsLoading(true);
     try {
-      let endpoint = `/users?page=${page}&size=10`;
-      if (search) {
-        endpoint += `&search=${encodeURIComponent(search)}`;
+      const params = new URLSearchParams();
+      params.set('page', page.toString());
+      params.set('size', '10');
+      if (filters.search) {
+        params.set('search', filters.search);
       }
-      const response = await api.get<PaginatedResponse<UserListItem>>(endpoint);
+      if (filters.role) {
+        params.set('role', filters.role);
+      }
+      if (filters.clearanceLevel) {
+        params.set('clearanceLevel', filters.clearanceLevel);
+      }
+      const response = await api.get<PaginatedResponse<UserListItem>>(`/users?${params.toString()}`);
       setUsers(response.content);
       setCurrentPage(response.page);
       setTotalPages(response.totalPages);
@@ -61,17 +70,17 @@ export default function UsersPage() {
 
   useEffect(() => {
     if (isAuthorized) {
-      fetchUsers(0, searchQuery);
+      fetchUsers(0, currentFilters);
     }
-  }, [isAuthorized, fetchUsers, searchQuery]);
+  }, [isAuthorized, fetchUsers, currentFilters]);
 
   const handlePageChange = (page: number) => {
-    fetchUsers(page, searchQuery);
+    fetchUsers(page, currentFilters);
   };
 
-  const handleSearch = (query: string) => {
-    setSearchQuery(query);
-    fetchUsers(0, query);
+  const handleFilter = (filters: UserFilters) => {
+    setCurrentFilters(filters);
+    fetchUsers(0, filters);
   };
 
   const handleCreateUser = () => {
@@ -102,7 +111,7 @@ export default function UsersPage() {
         showToast('User created successfully', 'success');
       }
       setIsFormModalOpen(false);
-      fetchUsers(currentPage, searchQuery);
+      fetchUsers(currentPage, currentFilters);
     } catch (err) {
       const message = err instanceof ApiError ? err.message : 'Operation failed';
       showToast(message, 'error');
@@ -118,7 +127,7 @@ export default function UsersPage() {
         user.enabled ? 'User disabled successfully' : 'User enabled successfully',
         'success'
       );
-      fetchUsers(currentPage, searchQuery);
+      fetchUsers(currentPage, currentFilters);
     } catch (err) {
       const message = err instanceof ApiError ? err.message : 'Operation failed';
       showToast(message, 'error');
@@ -136,7 +145,7 @@ export default function UsersPage() {
       await api.delete(`/users/${userToDelete.id}`);
       showToast('User deleted successfully', 'success');
       setUserToDelete(null);
-      fetchUsers(currentPage, searchQuery);
+      fetchUsers(currentPage, currentFilters);
     } catch (err) {
       const message = err instanceof ApiError ? err.message : 'Failed to delete user';
       showToast(message, 'error');
@@ -172,7 +181,7 @@ export default function UsersPage() {
         totalPages={totalPages}
         totalElements={totalElements}
         onPageChange={handlePageChange}
-        onSearch={handleSearch}
+        onFilter={handleFilter}
         onEdit={handleEditUser}
         onDelete={handleDeleteUser}
         onToggleEnabled={handleToggleEnabled}
