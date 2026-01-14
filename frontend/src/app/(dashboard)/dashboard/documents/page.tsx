@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRequireAuth } from '@/lib/auth';
-import { api } from '@/lib/api';
-import { DocumentList, type Document } from '@/components/documents';
+import { useRequireAuth } from '@/util/auth';
+import { api } from '@/util/api';
+import { DocumentList, type Document } from '@/features/documents';
 
 export default function DocumentsPage() {
   // Role check - redirects to /unauthorized if not OFFICER or ADMINISTRATOR

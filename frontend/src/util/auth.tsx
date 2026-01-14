@@ -11,7 +11,7 @@ import {
 import { useRouter } from 'next/navigation';
 import { api, ApiError } from './api';
 import { authEvents } from './auth-events';
-import { useToast } from '@/components/ui/toast';
+import { useToast } from '@/components';
 
 export type UserRole = 'ADMINISTRATOR' | 'OFFICER' | 'AUDITOR';
 

@@ -1,8 +1,8 @@
 'use client';
 
 import { type ReactNode } from 'react';
-import { AuthProvider } from '@/lib/auth';
-import { ToastProvider } from '@/components/ui/toast';
+import { AuthProvider } from '@/util/auth';
+import { ToastProvider } from '@/components';
 
 export function Providers({ children }: { children: ReactNode }) {
   return (

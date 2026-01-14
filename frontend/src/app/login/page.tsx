@@ -2,9 +2,8 @@
 
 import { useState, type FormEvent } from 'react';
 import Link from 'next/link';
-import { useAuth } from '@/lib/auth';
-import { Button } from '@/components/ui/button';
-import { FormField } from '@/components/ui/form-field';
+import { useAuth } from '@/util/auth';
+import { Button, FormField } from '@/components';
 
 export default function LoginPage() {
   const { login } = useAuth();
