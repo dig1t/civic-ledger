@@ -13,6 +13,7 @@ export default function DocumentsPage() {
   const { isAuthorized } = useRequireAuth('OFFICER', 'ADMINISTRATOR');
   const [documents, setDocuments] = useState<Document[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
@@ -20,17 +21,19 @@ export default function DocumentsPage() {
 
   const loadDocuments = useCallback(async (page: number, query?: string) => {
     setIsLoading(true);
+    setError(null);
     try {
       let endpoint = `/documents?page=${page}&size=${PAGE_SIZE}`;
       if (query) {
         endpoint += `&search=${encodeURIComponent(query)}`;
       }
       const response = await api.get<PaginatedResponse<Document>>(endpoint);
-      setDocuments(response.content);
-      setCurrentPage(response.page);
-      setTotalPages(response.totalPages);
-      setTotalElements(response.totalElements);
-    } catch {
+      setDocuments(response.content || []);
+      setCurrentPage(response.page ?? 0);
+      setTotalPages(response.totalPages ?? 0);
+      setTotalElements(response.totalElements ?? 0);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load documents');
       setDocuments([]);
       setTotalPages(0);
       setTotalElements(0);
@@ -94,6 +97,12 @@ export default function DocumentsPage() {
           Search and download documents from the secure repository.
         </p>
       </header>
+
+      {error && (
+        <div className="rounded border border-error bg-error-lighter p-4 text-error-dark" role="alert">
+          {error}
+        </div>
+      )}
 
       <DocumentList
         documents={documents}
