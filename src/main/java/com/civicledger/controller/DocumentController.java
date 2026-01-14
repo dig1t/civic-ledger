@@ -65,17 +65,30 @@ public class DocumentController {
             @RequestParam(required = false) String search,
             @AuthenticationPrincipal User user) {
 
+        if (user == null) {
+            log.warn("listDocuments called with null user - authentication may have failed");
+            return ResponseEntity.status(401).build();
+        }
+
+        log.debug("listDocuments: user={}, clearance={}, page={}, size={}, search={}",
+                user.getEmail(), user.getClearanceLevel(), page, size, search);
+
         PageRequest pageRequest = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        User.ClassificationLevel maxLevel = clearanceValidator.getMaxAccessibleLevel(user);
+        List<User.ClassificationLevel> allowedLevels = clearanceValidator.getAccessibleLevels(user.getClearanceLevel());
+
+        log.debug("listDocuments: allowedLevels={}", allowedLevels);
 
         Page<Document> documents;
         if (search != null && !search.isBlank()) {
             // Filter search results by clearance level
-            documents = documentRepository.searchByFilenameWithClearance(search, maxLevel, pageRequest);
+            documents = documentRepository.searchByFilenameWithClearance(search, allowedLevels, pageRequest);
         } else {
             // Only show documents at or below user's clearance level
-            documents = documentRepository.findByClassificationLevelAtOrBelow(maxLevel, pageRequest);
+            documents = documentRepository.findByClassificationLevelIn(allowedLevels, pageRequest);
         }
+
+        log.debug("listDocuments: found {} documents (total: {})",
+                documents.getContent().size(), documents.getTotalElements());
 
         PagedResponse<DocumentDTO> response = PagedResponse.fromPage(documents, this::toDTO);
         return ResponseEntity.ok(response);
