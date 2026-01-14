@@ -106,12 +106,21 @@ export function UserAuditModal({
       const response = await api.get<PaginatedResponse<UserAuditLogEntry>>(
         `/audit-logs?userId=${user.id}&page=${page}&size=10`
       );
-      setLogs(response.content);
-      setCurrentPage(response.page);
-      setTotalPages(response.totalPages);
-      setTotalElements(response.totalElements);
+      // Handle both paginated response and direct array response
+      if (Array.isArray(response)) {
+        setLogs(response);
+        setTotalElements(response.length);
+        setTotalPages(1);
+        setCurrentPage(0);
+      } else {
+        setLogs(response.content || []);
+        setCurrentPage(response.page || 0);
+        setTotalPages(response.totalPages || 0);
+        setTotalElements(response.totalElements || 0);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load audit logs');
+      setLogs([]);
     } finally {
       setIsLoading(false);
     }
@@ -210,10 +219,10 @@ export function UserAuditModal({
           <div aria-live="polite" className="sr-only">
             {isLoading
               ? 'Loading audit logs...'
-              : `Showing ${logs.length} of ${totalElements} audit log entries`}
+              : `Showing ${logs?.length ?? 0} of ${totalElements} audit log entries`}
           </div>
 
-          {isLoading && logs.length === 0 ? (
+          {isLoading && (!logs || logs.length === 0) ? (
             <div className="py-12 text-center">
               <div
                 className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"
@@ -222,13 +231,13 @@ export function UserAuditModal({
               />
               <p className="mt-2 text-neutral-500">Loading audit logs...</p>
             </div>
-          ) : logs.length === 0 ? (
+          ) : !logs || logs.length === 0 ? (
             <div className="py-12 text-center text-neutral-500">
               No audit log entries found for this user
             </div>
           ) : (
             <ul className="space-y-2" role="log" aria-label="User audit log entries">
-              {logs.map((log) => (
+              {(logs || []).map((log) => (
                 <li key={log.id}>
                   <article className="rounded-lg border border-neutral-200 p-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                     <div className="flex-1 space-y-1">
@@ -274,7 +283,7 @@ export function UserAuditModal({
             </ul>
           )}
 
-          {isLoading && logs.length > 0 && (
+          {isLoading && logs && logs.length > 0 && (
             <div className="pt-4 text-center text-neutral-500">
               Loading...
             </div>
