@@ -39,3 +39,7 @@ target/
 ### Env ###
 .env
 
+### Uploads ###
+uploads/
+data/
+
