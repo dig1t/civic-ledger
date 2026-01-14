@@ -1,7 +1,7 @@
 'use client';
 
 import { type ReactNode, useId } from 'react';
-import { cn } from '@/lib/utils';
+import { cn } from '@/util/utils';
 import { Input, type InputProps } from './input';
 
 export interface FormFieldProps extends Omit<InputProps, 'error'> {

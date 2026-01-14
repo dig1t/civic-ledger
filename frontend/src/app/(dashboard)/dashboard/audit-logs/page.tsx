@@ -1,13 +1,13 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { useRequireAuth } from '@/lib/auth';
-import { api } from '@/lib/api';
+import { useRequireAuth } from '@/util/auth';
+import { api } from '@/util/api';
 import {
   AuditLogStream,
   type AuditLogEntry,
   type AuditLogFilters,
-} from '@/components/audit';
+} from '@/features/audit';
 
 // Backend returns a plain array of audit logs
 

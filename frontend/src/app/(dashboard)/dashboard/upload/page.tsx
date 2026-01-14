@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { useRequireAuth } from '@/lib/auth';
-import { api } from '@/lib/api';
-import { FileUpload } from '@/components/documents';
-import { FormField } from '@/components/ui';
+import { useRequireAuth } from '@/util/auth';
+import { api } from '@/util/api';
+import { FileUpload } from '@/features/documents';
+import { FormField } from '@/components';
 
 type ClassificationLevel = 'UNCLASSIFIED' | 'CONFIDENTIAL' | 'SECRET' | 'TOP_SECRET';
 

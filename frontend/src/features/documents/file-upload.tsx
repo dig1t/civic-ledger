@@ -1,8 +1,8 @@
 'use client';
 
 import { useCallback, useId, useRef, useState, type DragEvent } from 'react';
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
+import { cn } from '@/util/utils';
+import { Button } from '@/components';
 
 export type UploadStatus = 'idle' | 'uploading' | 'success' | 'error';
 

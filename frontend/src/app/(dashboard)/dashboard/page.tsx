@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useAuth } from '@/lib/auth';
-import { api } from '@/lib/api';
+import { useAuth } from '@/util/auth';
+import { api } from '@/util/api';
 
 interface DashboardStats {
   totalDocuments: number;
