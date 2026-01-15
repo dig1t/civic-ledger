@@ -94,7 +94,7 @@ public class DocumentController {
         log.debug("listDocuments: found {} documents (total: {})",
                 documents.getContent().size(), documents.getTotalElements());
 
-        PagedResponse<DocumentDTO> response = PagedResponse.fromPage(documents, this::toDTO);
+        PagedResponse<DocumentDTO> response = PagedResponse.fromPage(documents, this::toListDTO);
         return ResponseEntity.ok(response);
     }
 
@@ -485,6 +485,26 @@ public class DocumentController {
                 doc.getCreatedAt().toString(),
                 doc.getOriginalSize(),
                 doc.getAiSummary(),
+                doc.getSummaryGeneratedAt() != null ? doc.getSummaryGeneratedAt().toString() : null,
+                aiSummaryService.isSummarizable(doc.getContentType()),
+                doc.getIntegrityStatus() == null || doc.getIntegrityStatus() == Document.IntegrityStatus.VALID
+        );
+    }
+
+    /**
+     * Converts document to DTO for list responses, excluding AI summary text to reduce payload size.
+     */
+    private DocumentDTO toListDTO(Document doc) {
+        return new DocumentDTO(
+                doc.getId().toString(),
+                doc.getOriginalFilename(),
+                doc.getFileHash(),
+                doc.getClassificationLevel().name(),
+                doc.getVersionNumber(),
+                doc.getUploadedBy(),
+                doc.getCreatedAt().toString(),
+                doc.getOriginalSize(),
+                null, // Exclude aiSummary from list responses
                 doc.getSummaryGeneratedAt() != null ? doc.getSummaryGeneratedAt().toString() : null,
                 aiSummaryService.isSummarizable(doc.getContentType()),
                 doc.getIntegrityStatus() == null || doc.getIntegrityStatus() == Document.IntegrityStatus.VALID
