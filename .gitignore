@@ -32,6 +32,7 @@ target/
 
 ### VS Code ###
 .vscode/
+.claude/
 
 ### Mac ###
 .DS_Store
@@ -42,4 +43,3 @@ target/
 ### Uploads ###
 uploads/
 data/
-
