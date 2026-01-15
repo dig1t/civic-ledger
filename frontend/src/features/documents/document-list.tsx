@@ -214,13 +214,26 @@ export function DocumentList({
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex gap-1">
-                      {doc.canGenerateSummary && !doc.aiSummary && doc.downloadable && onGenerateSummary && (
+                      {doc.canGenerateSummary && onGenerateSummary && (
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => onGenerateSummary(doc)}
-                          disabled={generatingSummaryId === doc.id}
-                          aria-label={`Generate AI summary for ${doc.fileName}`}
+                          disabled={!doc.downloadable || !!doc.aiSummary || generatingSummaryId === doc.id}
+                          aria-label={
+                            !doc.downloadable
+                              ? `Cannot summarize ${doc.fileName} (file unavailable)`
+                              : doc.aiSummary
+                                ? `${doc.fileName} already summarized`
+                                : `Generate AI summary for ${doc.fileName}`
+                          }
+                          title={
+                            !doc.downloadable
+                              ? 'File corrupted or missing'
+                              : doc.aiSummary
+                                ? 'Already summarized'
+                                : undefined
+                          }
                         >
                           {generatingSummaryId === doc.id ? 'Generating...' : 'Summarize'}
                         </Button>
