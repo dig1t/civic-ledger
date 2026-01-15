@@ -1,7 +1,9 @@
 package com.civicledger.service;
 
+import com.civicledger.entity.AISummary;
 import com.civicledger.entity.Document;
 import com.civicledger.exception.StorageException;
+import com.civicledger.repository.AISummaryRepository;
 import com.civicledger.repository.DocumentRepository;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -40,6 +42,7 @@ public class AISummaryService {
 
     private final RestClient restClient;
     private final DocumentRepository documentRepository;
+    private final AISummaryRepository aiSummaryRepository;
     private final StorageService storageService;
     private final EncryptionService encryptionService;
 
@@ -50,6 +53,7 @@ public class AISummaryService {
 
     public AISummaryService(
             DocumentRepository documentRepository,
+            AISummaryRepository aiSummaryRepository,
             StorageService storageService,
             EncryptionService encryptionService,
             @Value("${civicledger.ai.enabled:false}") boolean enabled,
@@ -58,6 +62,7 @@ public class AISummaryService {
             @Value("${civicledger.ai.openai.max-tokens:100}") int maxTokens) {
 
         this.documentRepository = documentRepository;
+        this.aiSummaryRepository = aiSummaryRepository;
         this.storageService = storageService;
         this.encryptionService = encryptionService;
         this.enabled = enabled;
@@ -81,6 +86,7 @@ public class AISummaryService {
 
     /**
      * Generates an AI summary for the specified document.
+     * Checks cache first to avoid redundant OpenAI API calls.
      *
      * @param documentId The document UUID to summarize
      * @return The generated summary, or empty if unavailable
@@ -104,11 +110,28 @@ public class AISummaryService {
 
         Document document = docOpt.get();
         String contentType = document.getContentType();
+        String fileHash = document.getFileHash();
 
         if (!isSummarizable(contentType)) {
             log.debug("Document type not supported for summarization: {} ({})", documentId, contentType);
             return Optional.empty();
         }
+
+        // Check cache first
+        Optional<AISummary> cached = aiSummaryRepository.findByFileHash(fileHash);
+        if (cached.isPresent()) {
+            log.info("Cache hit for document {} (hash: {})", documentId, fileHash);
+            String cachedSummary = cached.get().getSummary();
+
+            // Update document with cached summary for quick access
+            document.setAiSummary(cachedSummary);
+            document.setSummaryGeneratedAt(cached.get().getGeneratedAt());
+            documentRepository.save(document);
+
+            return Optional.of(cachedSummary);
+        }
+
+        log.info("Cache miss for document {} (hash: {}), calling OpenAI API", documentId, fileHash);
 
         try {
             byte[] decryptedData = decryptDocument(document);
@@ -126,8 +149,22 @@ public class AISummaryService {
             }
 
             if (summary != null && !summary.isBlank()) {
+                Instant now = Instant.now();
+
+                // Save to cache
+                AISummary aiSummary = AISummary.builder()
+                        .fileHash(fileHash)
+                        .summary(summary)
+                        .contentType(contentType)
+                        .modelUsed(model)
+                        .generatedAt(now)
+                        .build();
+                aiSummaryRepository.save(aiSummary);
+                log.info("Saved summary to cache for hash: {}", fileHash);
+
+                // Update document
                 document.setAiSummary(summary);
-                document.setSummaryGeneratedAt(Instant.now());
+                document.setSummaryGeneratedAt(now);
                 documentRepository.save(document);
 
                 log.info("Generated AI summary for document: {}", documentId);
