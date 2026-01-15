@@ -43,3 +43,7 @@ target/
 ### Uploads ###
 uploads/
 data/
+
+### Transient docs ###
+docs/*_TODO.md
+docs/TODO-*.md
