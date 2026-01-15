@@ -164,6 +164,24 @@ public class Document {
     @Column
     private Instant expiresAt;
 
+    /**
+     * File integrity status for tracking corrupted/missing files.
+     * Null is treated as VALID for backwards compatibility.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column
+    @Builder.Default
+    private IntegrityStatus integrityStatus = IntegrityStatus.VALID;
+
+    /**
+     * Integrity status values for document files.
+     */
+    public enum IntegrityStatus {
+        VALID,           // File exists and hash verified
+        CORRUPTED,       // Hash verification failed
+        MISSING          // File not found in storage
+    }
+
     @PrePersist
     protected void onCreate() {
         if (createdAt == null) {
