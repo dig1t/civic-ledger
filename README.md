@@ -135,13 +135,17 @@ Users can only access documents at or below their clearance level.
 
 ## Usage
 
-### Default Development Credentials
+### Default Development Users
 
-For local development with mock authentication:
+The following test users are automatically created in the `dev` profile:
 
-| User | Role | Email |
-|------|------|-------|
-| Admin | ADMINISTRATOR | admin@civicledger.gov |
+| Name | Email | Password | Role | Clearance |
+|------|-------|----------|------|-----------|
+| System Administrator | admin@civicledger.gov | admin123 | ADMINISTRATOR | TOP_SECRET |
+| Jane Officer | officer@civicledger.gov | officer123 | OFFICER | SECRET |
+| John Auditor | auditor@civicledger.gov | auditor123 | AUDITOR | SECRET |
+
+> **Note:** These credentials are for local development only. Production environments use Keycloak for authentication.
 
 ### Common Operations
 
