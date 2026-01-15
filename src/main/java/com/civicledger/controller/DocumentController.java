@@ -12,6 +12,8 @@ import com.civicledger.service.EncryptionService;
 import com.civicledger.service.EncryptionService.EncryptionResult;
 import com.civicledger.service.HashingService;
 import com.civicledger.service.StorageService;
+import com.civicledger.service.AISummaryService;
+import com.civicledger.exception.StorageException;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -41,6 +43,7 @@ public class DocumentController {
     private final HashingService hashingService;
     private final StorageService storageService;
     private final ClearanceValidator clearanceValidator;
+    private final AISummaryService aiSummaryService;
 
     public DocumentController(
             DocumentRepository documentRepository,
@@ -48,13 +51,15 @@ public class DocumentController {
             EncryptionService encryptionService,
             HashingService hashingService,
             StorageService storageService,
-            ClearanceValidator clearanceValidator) {
+            ClearanceValidator clearanceValidator,
+            AISummaryService aiSummaryService) {
         this.documentRepository = documentRepository;
         this.auditService = auditService;
         this.encryptionService = encryptionService;
         this.hashingService = hashingService;
         this.storageService = storageService;
         this.clearanceValidator = clearanceValidator;
+        this.aiSummaryService = aiSummaryService;
     }
 
     @GetMapping
@@ -156,6 +161,9 @@ public class DocumentController {
                         if (!storageService.exists(doc.getStoragePath())) {
                             log.error("Document file not found in storage: {} (path: {})",
                                     id, doc.getStoragePath());
+                            // Mark document as missing
+                            doc.setIntegrityStatus(Document.IntegrityStatus.MISSING);
+                            documentRepository.save(doc);
                             auditService.log(
                                     ActionType.DOCUMENT_DOWNLOAD,
                                     "DOCUMENT",
@@ -174,15 +182,36 @@ public class DocumentController {
                                 encryptedData.length, id);
 
                         // Step 3: Decrypt the data
-                        byte[] iv = encryptionService.decodeFromBase64(doc.getEncryptionIv());
-                        byte[] decryptedData = encryptionService.decrypt(encryptedData, iv);
-                        log.debug("Decrypted to {} bytes", decryptedData.length);
+                        byte[] decryptedData;
+                        try {
+                            byte[] iv = encryptionService.decodeFromBase64(doc.getEncryptionIv());
+                            decryptedData = encryptionService.decrypt(encryptedData, iv);
+                            log.debug("Decrypted to {} bytes", decryptedData.length);
+                        } catch (Exception e) {
+                            log.error("Decryption failed for document {}: {}", id, e.getMessage());
+                            // Mark document as corrupted
+                            doc.setIntegrityStatus(Document.IntegrityStatus.CORRUPTED);
+                            documentRepository.save(doc);
+                            auditService.log(
+                                    ActionType.DOCUMENT_DOWNLOAD,
+                                    "DOCUMENT",
+                                    id.toString(),
+                                    AuditStatus.FAILURE,
+                                    "DECRYPTION FAILED: " + doc.getOriginalFilename() + " - " + e.getMessage(),
+                                    getClientIp(request),
+                                    request.getHeader("User-Agent")
+                            );
+                            return ResponseEntity.status(500).<StreamingResponseBody>body(null);
+                        }
 
                         // Step 4: Verify integrity with SHA-256 hash
                         String computedHash = hashingService.hash(decryptedData);
                         if (!hashingService.verify(decryptedData, doc.getFileHash())) {
                             log.error("Hash verification failed for document {}. Expected: {}, Got: {}",
                                     id, doc.getFileHash(), computedHash);
+                            // Mark document as corrupted
+                            doc.setIntegrityStatus(Document.IntegrityStatus.CORRUPTED);
+                            documentRepository.save(doc);
                             auditService.log(
                                     ActionType.DOCUMENT_DOWNLOAD,
                                     "DOCUMENT",
@@ -254,6 +283,21 @@ public class DocumentController {
                                 .contentLength(decryptedData.length)
                                 .body(stream);
 
+                    } catch (StorageException e) {
+                        log.error("Storage error for document {}: {}", id, e.getMessage());
+                        // Mark document as corrupted due to storage issues
+                        doc.setIntegrityStatus(Document.IntegrityStatus.CORRUPTED);
+                        documentRepository.save(doc);
+                        auditService.log(
+                                ActionType.DOCUMENT_DOWNLOAD,
+                                "DOCUMENT",
+                                id.toString(),
+                                AuditStatus.FAILURE,
+                                "STORAGE ERROR: " + doc.getOriginalFilename() + " - " + e.getMessage(),
+                                getClientIp(request),
+                                request.getHeader("User-Agent")
+                        );
+                        return ResponseEntity.internalServerError().<StreamingResponseBody>build();
                     } catch (Exception e) {
                         log.error("Failed to download document {}: {}", id, e.getMessage(), e);
                         auditService.log(
@@ -376,6 +420,60 @@ public class DocumentController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    /**
+     * Generate AI summary for a document.
+     * Only works for text-based documents.
+     */
+    @PostMapping("/{id}/summary")
+    public ResponseEntity<?> generateSummary(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal User user,
+            HttpServletRequest request) {
+
+        if (!aiSummaryService.isAvailable()) {
+            return ResponseEntity.status(503)
+                    .body(new ErrorResponse("AI summary service is not available"));
+        }
+
+        return documentRepository.findByIdAndDeletedFalse(id)
+                .map(doc -> {
+                    // Validate clearance
+                    if (!clearanceValidator.hasAccess(user, doc)) {
+                        return ResponseEntity.status(403)
+                                .body(new ErrorResponse("Access denied"));
+                    }
+
+                    if (!aiSummaryService.isSummarizable(doc.getContentType())) {
+                        return ResponseEntity.badRequest()
+                                .body(new ErrorResponse("Document type not supported for AI summary"));
+                    }
+
+                    var summary = aiSummaryService.generateSummary(id);
+
+                    if (summary.isPresent()) {
+                        auditService.log(
+                                ActionType.DOCUMENT_VIEW,
+                                "DOCUMENT",
+                                id.toString(),
+                                AuditStatus.SUCCESS,
+                                "Generated AI summary for: " + doc.getOriginalFilename(),
+                                getClientIp(request),
+                                request.getHeader("User-Agent")
+                        );
+
+                        // Refresh document from DB to get updated summary
+                        Document updated = documentRepository.findById(id).orElse(doc);
+                        return ResponseEntity.ok(toDTO(updated));
+                    } else {
+                        return ResponseEntity.status(500)
+                                .body(new ErrorResponse("Failed to generate summary"));
+                    }
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    record ErrorResponse(String message) {}
+
     private DocumentDTO toDTO(Document doc) {
         return new DocumentDTO(
                 doc.getId().toString(),
@@ -385,7 +483,11 @@ public class DocumentController {
                 doc.getVersionNumber(),
                 doc.getUploadedBy(),
                 doc.getCreatedAt().toString(),
-                doc.getOriginalSize()
+                doc.getOriginalSize(),
+                doc.getAiSummary(),
+                doc.getSummaryGeneratedAt() != null ? doc.getSummaryGeneratedAt().toString() : null,
+                aiSummaryService.isSummarizable(doc.getContentType()),
+                doc.getIntegrityStatus() == null || doc.getIntegrityStatus() == Document.IntegrityStatus.VALID
         );
     }
 
@@ -397,7 +499,11 @@ public class DocumentController {
             Integer versionNumber,
             String uploadedBy,
             String uploadedAt,
-            Long fileSize
+            Long fileSize,
+            String aiSummary,
+            String summaryGeneratedAt,
+            boolean canGenerateSummary,
+            boolean downloadable
     ) {}
 
     private String getClientIp(HttpServletRequest request) {

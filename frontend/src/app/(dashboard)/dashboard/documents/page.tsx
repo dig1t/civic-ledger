@@ -22,6 +22,7 @@ export default function DocumentsPage() {
   const [totalElements, setTotalElements] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [generatingSummaryId, setGeneratingSummaryId] = useState<string | null>(null);
 
   const canUpload = hasRole('OFFICER', 'ADMINISTRATOR');
 
@@ -115,6 +116,37 @@ export default function DocumentsPage() {
     loadDocuments(0, searchQuery);
   }
 
+  async function handleGenerateSummary(doc: Document) {
+    setGeneratingSummaryId(doc.id);
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/documents/${doc.id}/summary`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.message || 'Failed to generate summary');
+      }
+
+      const updatedDoc = await response.json();
+      // Update the document in the list with the new summary
+      setDocuments(docs =>
+        docs.map(d => d.id === doc.id ? { ...d, aiSummary: updatedDoc.aiSummary } : d)
+      );
+      showToast('AI summary generated successfully', 'success');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to generate summary', 'error');
+    } finally {
+      setGeneratingSummaryId(null);
+    }
+  }
+
   // Role check in progress or unauthorized - useRequireAuth handles redirect
   if (!isAuthorized) {
     return null;
@@ -152,6 +184,8 @@ export default function DocumentsPage() {
         onPageChange={handlePageChange}
         onSearch={handleSearch}
         onDownload={handleDownload}
+        onGenerateSummary={handleGenerateSummary}
+        generatingSummaryId={generatingSummaryId}
       />
 
       {/* Upload Modal */}
