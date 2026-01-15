@@ -13,6 +13,7 @@ import com.civicledger.service.EncryptionService.EncryptionResult;
 import com.civicledger.service.HashingService;
 import com.civicledger.service.StorageService;
 import com.civicledger.service.AISummaryService;
+import com.civicledger.exception.StorageException;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -160,6 +161,9 @@ public class DocumentController {
                         if (!storageService.exists(doc.getStoragePath())) {
                             log.error("Document file not found in storage: {} (path: {})",
                                     id, doc.getStoragePath());
+                            // Mark document as missing
+                            doc.setIntegrityStatus(Document.IntegrityStatus.MISSING);
+                            documentRepository.save(doc);
                             auditService.log(
                                     ActionType.DOCUMENT_DOWNLOAD,
                                     "DOCUMENT",
@@ -178,15 +182,36 @@ public class DocumentController {
                                 encryptedData.length, id);
 
                         // Step 3: Decrypt the data
-                        byte[] iv = encryptionService.decodeFromBase64(doc.getEncryptionIv());
-                        byte[] decryptedData = encryptionService.decrypt(encryptedData, iv);
-                        log.debug("Decrypted to {} bytes", decryptedData.length);
+                        byte[] decryptedData;
+                        try {
+                            byte[] iv = encryptionService.decodeFromBase64(doc.getEncryptionIv());
+                            decryptedData = encryptionService.decrypt(encryptedData, iv);
+                            log.debug("Decrypted to {} bytes", decryptedData.length);
+                        } catch (Exception e) {
+                            log.error("Decryption failed for document {}: {}", id, e.getMessage());
+                            // Mark document as corrupted
+                            doc.setIntegrityStatus(Document.IntegrityStatus.CORRUPTED);
+                            documentRepository.save(doc);
+                            auditService.log(
+                                    ActionType.DOCUMENT_DOWNLOAD,
+                                    "DOCUMENT",
+                                    id.toString(),
+                                    AuditStatus.FAILURE,
+                                    "DECRYPTION FAILED: " + doc.getOriginalFilename() + " - " + e.getMessage(),
+                                    getClientIp(request),
+                                    request.getHeader("User-Agent")
+                            );
+                            return ResponseEntity.status(500).<StreamingResponseBody>body(null);
+                        }
 
                         // Step 4: Verify integrity with SHA-256 hash
                         String computedHash = hashingService.hash(decryptedData);
                         if (!hashingService.verify(decryptedData, doc.getFileHash())) {
                             log.error("Hash verification failed for document {}. Expected: {}, Got: {}",
                                     id, doc.getFileHash(), computedHash);
+                            // Mark document as corrupted
+                            doc.setIntegrityStatus(Document.IntegrityStatus.CORRUPTED);
+                            documentRepository.save(doc);
                             auditService.log(
                                     ActionType.DOCUMENT_DOWNLOAD,
                                     "DOCUMENT",
@@ -258,6 +283,21 @@ public class DocumentController {
                                 .contentLength(decryptedData.length)
                                 .body(stream);
 
+                    } catch (StorageException e) {
+                        log.error("Storage error for document {}: {}", id, e.getMessage());
+                        // Mark document as corrupted due to storage issues
+                        doc.setIntegrityStatus(Document.IntegrityStatus.CORRUPTED);
+                        documentRepository.save(doc);
+                        auditService.log(
+                                ActionType.DOCUMENT_DOWNLOAD,
+                                "DOCUMENT",
+                                id.toString(),
+                                AuditStatus.FAILURE,
+                                "STORAGE ERROR: " + doc.getOriginalFilename() + " - " + e.getMessage(),
+                                getClientIp(request),
+                                request.getHeader("User-Agent")
+                        );
+                        return ResponseEntity.internalServerError().<StreamingResponseBody>build();
                     } catch (Exception e) {
                         log.error("Failed to download document {}: {}", id, e.getMessage(), e);
                         auditService.log(
@@ -446,7 +486,8 @@ public class DocumentController {
                 doc.getOriginalSize(),
                 doc.getAiSummary(),
                 doc.getSummaryGeneratedAt() != null ? doc.getSummaryGeneratedAt().toString() : null,
-                aiSummaryService.isSummarizable(doc.getContentType())
+                aiSummaryService.isSummarizable(doc.getContentType()),
+                doc.getIntegrityStatus() == null || doc.getIntegrityStatus() == Document.IntegrityStatus.VALID
         );
     }
 
@@ -461,7 +502,8 @@ public class DocumentController {
             Long fileSize,
             String aiSummary,
             String summaryGeneratedAt,
-            boolean canGenerateSummary
+            boolean canGenerateSummary,
+            boolean downloadable
     ) {}
 
     private String getClientIp(HttpServletRequest request) {

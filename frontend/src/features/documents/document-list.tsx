@@ -16,6 +16,7 @@ export interface Document {
   aiSummary?: string | null;
   summaryGeneratedAt?: string | null;
   canGenerateSummary: boolean;
+  downloadable: boolean;
 }
 
 interface DocumentListProps {
@@ -228,9 +229,11 @@ export function DocumentList({
                         variant="ghost"
                         size="sm"
                         onClick={() => onDownload?.(doc)}
-                        aria-label={`Download ${doc.fileName}`}
+                        disabled={!doc.downloadable}
+                        aria-label={doc.downloadable ? `Download ${doc.fileName}` : `${doc.fileName} is unavailable (file corrupted or missing)`}
+                        title={!doc.downloadable ? 'File corrupted or missing' : undefined}
                       >
-                        Download
+                        {doc.downloadable ? 'Download' : 'Unavailable'}
                       </Button>
                     </div>
                   </td>
