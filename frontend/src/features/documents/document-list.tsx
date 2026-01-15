@@ -214,7 +214,7 @@ export function DocumentList({
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex gap-1">
-                      {doc.canGenerateSummary && !doc.aiSummary && onGenerateSummary && (
+                      {doc.canGenerateSummary && !doc.aiSummary && doc.downloadable && onGenerateSummary && (
                         <Button
                           variant="ghost"
                           size="sm"
