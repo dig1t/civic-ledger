@@ -86,6 +86,13 @@
 			<version>4.0.0</version>
 		</dependency>
 
+		<!-- PDF text extraction -->
+		<dependency>
+			<groupId>org.apache.pdfbox</groupId>
+			<artifactId>pdfbox</artifactId>
+			<version>3.0.3</version>
+		</dependency>
+
 		<!-- JWT Support for mock authentication -->
 		<dependency>
 			<groupId>io.jsonwebtoken</groupId>
