@@ -1,6 +1,7 @@
 package com.civicledger.service;
 
 import com.civicledger.entity.Document;
+import com.civicledger.exception.StorageException;
 import com.civicledger.repository.DocumentRepository;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -156,13 +157,35 @@ public class AISummaryService {
 
     private byte[] decryptDocument(Document document) {
         try {
+            // Check if file exists first
+            if (!storageService.exists(document.getStoragePath())) {
+                log.error("Document file not found in storage: {} (path: {})",
+                        document.getId(), document.getStoragePath());
+                markDocumentUnavailable(document, Document.IntegrityStatus.MISSING);
+                return null;
+            }
+
             byte[] encryptedData = storageService.retrieve(document.getStoragePath());
             byte[] iv = encryptionService.decodeFromBase64(document.getEncryptionIv());
             return encryptionService.decrypt(encryptedData, iv);
+        } catch (StorageException e) {
+            log.error("Storage error for document {}: {}", document.getId(), e.getMessage());
+            markDocumentUnavailable(document, Document.IntegrityStatus.CORRUPTED);
+            return null;
         } catch (Exception e) {
-            log.error("Failed to decrypt document: {}", e.getMessage());
+            log.error("Failed to decrypt document {}: {}", document.getId(), e.getMessage());
+            markDocumentUnavailable(document, Document.IntegrityStatus.CORRUPTED);
             return null;
         }
+    }
+
+    /**
+     * Marks a document as unavailable due to storage/integrity issues.
+     */
+    private void markDocumentUnavailable(Document document, Document.IntegrityStatus status) {
+        document.setIntegrityStatus(status);
+        documentRepository.save(document);
+        log.warn("Marked document {} as {}", document.getId(), status);
     }
 
     private String summarizeText(byte[] data) {
