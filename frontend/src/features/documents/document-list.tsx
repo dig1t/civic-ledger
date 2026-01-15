@@ -214,25 +214,29 @@ export function DocumentList({
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex gap-1">
-                      {doc.canGenerateSummary && onGenerateSummary && (
+                      {onGenerateSummary && (
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => onGenerateSummary(doc)}
-                          disabled={!doc.downloadable || !!doc.aiSummary || generatingSummaryId === doc.id}
+                          disabled={!doc.canGenerateSummary || !doc.downloadable || !!doc.aiSummary || generatingSummaryId === doc.id}
                           aria-label={
-                            !doc.downloadable
-                              ? `Cannot summarize ${doc.fileName} (file unavailable)`
-                              : doc.aiSummary
-                                ? `${doc.fileName} already summarized`
-                                : `Generate AI summary for ${doc.fileName}`
+                            !doc.canGenerateSummary
+                              ? `Cannot summarize ${doc.fileName} (unsupported file type)`
+                              : !doc.downloadable
+                                ? `Cannot summarize ${doc.fileName} (file unavailable)`
+                                : doc.aiSummary
+                                  ? `${doc.fileName} already summarized`
+                                  : `Generate AI summary for ${doc.fileName}`
                           }
                           title={
-                            !doc.downloadable
-                              ? 'File corrupted or missing'
-                              : doc.aiSummary
-                                ? 'Already summarized'
-                                : undefined
+                            !doc.canGenerateSummary
+                              ? 'Unsupported file type'
+                              : !doc.downloadable
+                                ? 'File corrupted or missing'
+                                : doc.aiSummary
+                                  ? 'Already summarized'
+                                  : undefined
                           }
                         >
                           {generatingSummaryId === doc.id ? 'Generating...' : 'Summarize'}
