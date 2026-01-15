@@ -10,6 +10,7 @@ const navigationLinks = {
   ADMINISTRATOR: [
     { href: '/dashboard', label: 'Overview', icon: HomeIcon },
     { href: '/dashboard/documents', label: 'Documents', icon: DocumentIcon },
+    { href: '/dashboard/upload', label: 'Upload', icon: UploadIcon },
     { href: '/dashboard/audit-logs', label: 'Audit Logs', icon: ClipboardIcon },
     { href: '/dashboard/users', label: 'Users', icon: UsersIcon },
   ],

@@ -68,12 +68,20 @@ export const api = {
   async upload<T>(
     endpoint: string,
     file: File,
-    onProgress?: (progress: number) => void
+    onProgress?: (progress: number) => void,
+    extraFields?: Record<string, string>
   ): Promise<T> {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       const formData = new FormData();
       formData.append('file', file);
+
+      // Add any extra fields to the form data
+      if (extraFields) {
+        for (const [key, value] of Object.entries(extraFields)) {
+          formData.append(key, value);
+        }
+      }
 
       xhr.upload.addEventListener('progress', (event) => {
         if (event.lengthComputable && onProgress) {

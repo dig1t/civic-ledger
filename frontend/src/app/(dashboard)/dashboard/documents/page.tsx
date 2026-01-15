@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useAuth, useRequireAuth } from '@/util/auth';
 import { api } from '@/util/api';
 import { Button, useToast } from '@/components';
-import { DocumentList, FileUpload, type Document } from '@/features/documents';
+import { DocumentList, UploadForm, type Document, type ClassificationLevel } from '@/features/documents';
 import type { PaginatedResponse } from '@/types/api';
 
 const PAGE_SIZE = 20;
@@ -91,9 +91,10 @@ export default function DocumentsPage() {
     }
   }
 
-  async function handleUpload(file: File) {
+  async function handleUpload(file: File, classification: ClassificationLevel) {
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('classificationLevel', classification);
 
     const response = await fetch(
       `${process.env.NEXT_PUBLIC_API_URL}/documents/upload`,
@@ -111,8 +112,7 @@ export default function DocumentsPage() {
       throw new Error(data.message || 'Upload failed');
     }
 
-    showToast('Document uploaded successfully', 'success');
-    setIsUploadModalOpen(false);
+    showToast(`${file.name} uploaded successfully`, 'success');
     loadDocuments(0, searchQuery);
   }
 
@@ -191,12 +191,12 @@ export default function DocumentsPage() {
       {/* Upload Modal */}
       {isUploadModalOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="upload-dialog-title"
         >
-          <div className="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl">
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg bg-white p-6 shadow-xl">
             <div className="mb-4 flex items-center justify-between">
               <h2 id="upload-dialog-title" className="text-lg font-semibold text-neutral-900">
                 Upload Document
@@ -210,7 +210,7 @@ export default function DocumentsPage() {
                 Close
               </Button>
             </div>
-            <FileUpload onUpload={handleUpload} />
+            <UploadForm onUpload={handleUpload} />
           </div>
         </div>
       )}
