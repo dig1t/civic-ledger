@@ -116,6 +116,18 @@ public class Document {
     private String description;
 
     /**
+     * AI-generated summary of the document content.
+     */
+    @Column(length = 500)
+    private String aiSummary;
+
+    /**
+     * Timestamp when AI summary was generated.
+     */
+    @Column
+    private Instant summaryGeneratedAt;
+
+    /**
      * Optional tags for categorization (comma-separated).
      */
     @Column(length = 500)
@@ -151,6 +163,24 @@ public class Document {
      */
     @Column
     private Instant expiresAt;
+
+    /**
+     * File integrity status for tracking corrupted/missing files.
+     * Null is treated as VALID for backwards compatibility.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column
+    @Builder.Default
+    private IntegrityStatus integrityStatus = IntegrityStatus.VALID;
+
+    /**
+     * Integrity status values for document files.
+     */
+    public enum IntegrityStatus {
+        VALID,           // File exists and hash verified
+        CORRUPTED,       // Hash verification failed
+        MISSING          // File not found in storage
+    }
 
     @PrePersist
     protected void onCreate() {

@@ -13,6 +13,10 @@ export interface Document {
   uploadedBy: string;
   uploadedAt: string;
   fileSize: number;
+  aiSummary?: string | null;
+  summaryGeneratedAt?: string | null;
+  canGenerateSummary: boolean;
+  downloadable: boolean;
 }
 
 interface DocumentListProps {
@@ -25,6 +29,8 @@ interface DocumentListProps {
   onPageChange: (page: number) => void;
   onDownload?: (doc: Document) => void;
   onSearch?: (query: string) => void;
+  onGenerateSummary?: (doc: Document) => void;
+  generatingSummaryId?: string | null;
 }
 
 const classificationColors = {
@@ -60,6 +66,8 @@ export function DocumentList({
   onPageChange,
   onDownload,
   onSearch,
+  onGenerateSummary,
+  generatingSummaryId,
 }: DocumentListProps) {
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -179,6 +187,11 @@ export function DocumentList({
                       <p className="truncate text-xs text-neutral-500" title={doc.fileHash}>
                         SHA-256: {doc.fileHash.substring(0, 16)}...
                       </p>
+                      {doc.aiSummary && (
+                        <p className="mt-1 text-sm text-primary-dark italic" title="AI-generated summary">
+                          {doc.aiSummary}
+                        </p>
+                      )}
                     </div>
                   </td>
                   <td className="px-4 py-3">
@@ -200,14 +213,42 @@ export function DocumentList({
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => onDownload?.(doc)}
-                      aria-label={`Download ${doc.fileName}`}
-                    >
-                      Download
-                    </Button>
+                    <div className="flex gap-1">
+                      {doc.canGenerateSummary && onGenerateSummary && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => onGenerateSummary(doc)}
+                          disabled={!doc.downloadable || !!doc.aiSummary || generatingSummaryId === doc.id}
+                          aria-label={
+                            !doc.downloadable
+                              ? `Cannot summarize ${doc.fileName} (file unavailable)`
+                              : doc.aiSummary
+                                ? `${doc.fileName} already summarized`
+                                : `Generate AI summary for ${doc.fileName}`
+                          }
+                          title={
+                            !doc.downloadable
+                              ? 'File corrupted or missing'
+                              : doc.aiSummary
+                                ? 'Already summarized'
+                                : undefined
+                          }
+                        >
+                          {generatingSummaryId === doc.id ? 'Generating...' : 'Summarize'}
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onDownload?.(doc)}
+                        disabled={!doc.downloadable}
+                        aria-label={doc.downloadable ? `Download ${doc.fileName}` : `${doc.fileName} is unavailable (file corrupted or missing)`}
+                        title={!doc.downloadable ? 'File corrupted or missing' : undefined}
+                      >
+                        {doc.downloadable ? 'Download' : 'Unavailable'}
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))
